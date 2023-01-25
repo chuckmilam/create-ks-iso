@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+# 
+
+# Source files for implantation into new ISO (ks.cfg, etc.)
+# This needs to be an absolute path, not a relative path.
+# Also serves as the base for all relative paths defined below.
+# Default is pwd 
+#SRCDIR=""
+
+# Source Media ISO Location
+#ISOSRCDIR=""
+

@@ -1,29 +1,40 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 # Reference:  How to create a modified Red Hat Enterprise Linux ISO with kickstart file 
 #             or modified installation media? (https://access.redhat.com/solutions/60959)
 
 # Required packages: isomd5sum, syslinux, genisoimage
 
-###############
-## Variables ##
-###############
 
-# Source Media Location
-ISOSRCDIR="./isosrc" 
+
+############################
+## ISO Creation Variables ##
+############################
+
+# Source files for implantation into new ISO (ks.cfg, etc.)
+# This needs to be an absolute path, not a relative path.
+# Also serves as the base for all relative paths defined below.
+# Default is pwd 
+SRCDIR="${SRCDIR:=${PWD}}"
+
+# Source CONFIG_FILE for variables
+. "$SRCDIR/CONFIG_FILE"
+
+# Source Media ISO Location
+: "${ISOSRCDIR:=$SRCDIR/isosrc}" # Default if not defined
 
 # Exit if ISO source location does not exist
-# Note: We don't create this automatically to avoid potentially clobbering a large ISO store
-if [ ! -d "$ISOSRCDIR" ]
-  then echo "ISO source directory not found, please correct. Exiting."
-  exit
+# Note: Don't create this automatically to avoid potentially clobbering a large ISO store
+if [[ ! -d "$ISOSRCDIR" ]] || [[ ! -h "$ISOSRCDIR" ]]; then
+  echo "ISO source directory not found, please correct. Exiting."
+  exit 1
 fi
 
-# ISO Result Location
-ISORESULTDIR="./result"
+# ISO Result/Output Location
+: "${ISORESULTDIR:=$SRCDIR/result}" # Default if not defined
 
 # Create ISO Result Location if it does not exist
-mkdir -p $ISORESULTDIR
+mkdir -p "$ISORESULTDIR"
 
 # OEM Source Media File Name
 OEMSRCISO="CentOS-Stream-9-latest-x86_64-dvd1.iso"
@@ -34,50 +45,35 @@ NEWISONAME="Random_Creds-CentOS-Stream-9-latest-x86_64-dvd1.iso"
 # Source kickstart config file, locate in $SRCDIR
 KSCFGSRCFILE="ks.cfg"
 
-# Do not change this, Red Hat internals look for this specific name
+# Do not change this, some Red Hat internals look for this specific name
 KSCFGDESTFILENAME="ks.cfg"
 
 # ISO Volume Name must match or boot will fail
 OEMSRCISOVOLNAME=$(blkid -o value $ISOSRCDIR/$OEMSRCISO | sed -n 3p)
 
 # Temporary mount point for OEM Source Media
-ISOTMPMNT="./mnt/iso"
+ISOTMPMNT="$SRCDIR/mnt/iso"
 
 # Create temporary mount point for OEM Source Media if it does not exist
-mkdir -p $ISOTMPMNT
+mkdir -p "$ISOTMPMNT"
 
 SCRATCHISONAME="NEWISO.iso"
 
-# Source files for implantation into new ISO (ks.cfg, etc.)
-# This needs to be an absolute path, not a relative path.
-SRCDIR="${PWD}"
-
 # Ensure these directories are mounted where 4GB+ files are allowed, /tmp may not support this
-SCRATCHDIR="./tmp"
+SCRATCHDIR="$SRCDIR/tmp"
 WORKDIRNAME="iso-workdir"
 WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 # Create scratch space directory
-mkdir -p $WORKDIR
+mkdir -p "$WORKDIR"
 
-##################
-## Main Section ##
-##################
+#######################
+# Kickstart variables #
+#######################
 
-# Check for required root privileges
-if [ "$EUID" -ne 0 ]
-  then echo "This script requires root privileges for the \"mount\" command. Please run with sudo or su."
-  exit
-fi
+# Define or Generate Passwords and ssh keys
 
-# Remove old ssh keys
-rm -f svc.ansible.id_rsa svc.ansible.id_rsa.pub
-
-##############################################
-# Generate Random Passwords and new ssh keys #
-##############################################
-
-# Generate a random password of 16 characters using python
-password=$(python3 -c 'import random; import string; print("".join(random.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(16)))')
+# Generate a random password of 36 characters using python
+password=$(python3 -c 'import sys; import random; import string; print("".join(random.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' 36)
 
 # Write password to file
 echo "$password" > password.txt
@@ -89,9 +85,18 @@ encrypted_password=$(python3 -c 'import crypt,getpass; print(crypt.crypt("$passw
 # command is interactive-only, so we have to emulate the keypresses:
 grub2_password=$(echo -e "$password\n$password" | grub2-mkpasswd-pbkdf2 | awk '/grub.pbkdf/{print$NF}')
 
+# Remove old randomly-generated ssh keys
+rm -f "$SRCDIR"/*.id_rsa "$SRCDIR"/*.pub
+
 # Create ssh key pair
-ssh-keygen -t ecdsa-sha2-nistp521 -b 521 -N "" -f ./svc.ansible.id_rsa -q -C "kickstart-generated bootstrapping key"
+ssh-keygen -t ecdsa-sha2-nistp521 -b 521 -N "" -f "$SRCDIR"/svc.ansible.id_rsa -q -C "kickstart-generated bootstrapping key"
 ssh_pub_key=$(<svc.ansible.id_rsa.pub)
+
+# Check for required root privileges
+if [ "$EUID" -ne 0 ]
+  then echo "This script requires root privileges for the \"mount\" command. Please run with sudo or su."
+  exit
+fi
 
 # Copy ks.cfg from template file
 cp ks-template.cfg ks.cfg
@@ -103,7 +108,7 @@ rootpw --iscrypted $encrypted_password
 
 # Specify how the bootloader should be installed (required)
 # This password hash must be generated by: grub2-mkpasswd-pbkdf2
-bootloader --append "fips=1" --iscrypted --password=$grub2_password
+bootloader --iscrypted --password=$grub2_password
 
 # user (optional)
 #   User Notes:
@@ -121,11 +126,11 @@ sshkey --username=svc.ansible "$ssh_pub_key"
 EOF
 
 # Mount OEM Install Media ISO
-mount $ISOSRCDIR/$OEMSRCISO $ISOTMPMNT
+mount -o ro $ISOSRCDIR/$OEMSRCISO $ISOTMPMNT
 
 # Extract the ISO image into a working directory
 shopt -s dotglob
-cp -avRf $ISOTMPMNT/* $WORKDIR
+cp -aRf $ISOTMPMNT/* $WORKDIR
 
 # Unmount the OEM ISO
 umount $ISOTMPMNT
@@ -133,36 +138,53 @@ umount $ISOTMPMNT
 # Copy ks.cfg into working dir
 cp $SRCDIR/$KSCFGSRCFILE $WORKDIR/$KSCFGDESTFILENAME
 
-# Modify isolinux.cfg for FIPS mode and ks boot
-sed -i '/rescue/!s/ quiet/ fips=1 inst.ks=cdrom:\/ks.cfg quiet/' $WORKDIR/isolinux/isolinux.cfg
+# Modify isolinux.cfg ks boot
+sed -i '/rescue/!s/ quiet/ inst.ks=cdrom:\/ks.cfg quiet/' $WORKDIR/isolinux/isolinux.cfg
 # Modify isolinux.cfg menu title
-sed -i 's/menu title Red/menu title STIG Kickstart Install Red/' $WORKDIR/isolinux/isolinux.cfg
+sed -i 's/menu title Red/menu title RandomCreds Kickstart Install Red/' $WORKDIR/isolinux/isolinux.cfg
 
 # Modify grub.cfg for ks boot
 sed -i '/rescue/!s/ quiet/ inst.ks=cdrom:\/ks.cfg quiet/' $WORKDIR/EFI/BOOT/grub.cfg
-# Modify grub.cfg menu entries to show STIG compliance
-sed -i 's/Install/STIG Install/' $WORKDIR/EFI/BOOT/grub.cfg
-sed -i 's/Test/STIG Test/' $WORKDIR/EFI/BOOT/grub.cfg
+# Modify grub.cfg menu entries to show RandomCreds
+sed -i 's/Install/RandomCreds Install/' $WORKDIR/EFI/BOOT/grub.cfg
+sed -i 's/Test/RandomCreds Test/' $WORKDIR/EFI/BOOT/grub.cfg
 
 # Create new ISO  
 # Note, the relative pathnames in the arguments to mkisofs are required, as per the man page:
 # "The pathname must be relative to the source path..."
 # This is why we do the rather ugly "cd" into the working dir below.
 cd $WORKDIR || { echo "Unable to change directory, exiting."; exit 1; }
-mkisofs -o ../$SCRATCHISONAME -b isolinux/isolinux.bin -J -R -l -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e images/efiboot.img -no-emul-boot -graft-points -joliet-long -V "$OEMSRCISOVOLNAME" .
+echo -e "Building new ISO image....\n"
+mkisofs -quiet -o ../$SCRATCHISONAME -b isolinux/isolinux.bin -J -R -l -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e images/efiboot.img -no-emul-boot -graft-points -joliet-long -V "$OEMSRCISOVOLNAME" .
 cd $SRCDIR || { echo "Unable to change directory, exiting."; exit 1; }
 
 # Build UEFI bootable image
+echo -e "Making UEFI bootable image in $SCRATCHDIR/$SCRATCHISONAME....\n"
 isohybrid --uefi $SCRATCHDIR/$SCRATCHISONAME
 
 # Implant a md5 checksum into the new ISO image
+echo -e "Implanting MD5 checksum into $SCRATCHISONAME:\n"
 implantisomd5 $SCRATCHDIR/$SCRATCHISONAME
 
 # Move new iso to ISOs dir
+echo -e "\nMoving new $SCRATCHISONAME to result directory and renaming to $NEWISONAME....\n"
 mv $SCRATCHDIR/$SCRATCHISONAME $ISORESULTDIR/$NEWISONAME
 
-# Chown new ISO (will be owned by root otherwise)
-chown "$SUDO_UID":"$SUDO_GID" $ISORESULTDIR/$NEWISONAME
+# Chown new ISO and other generated files (will be owned by root otherwise)
+echo -e "Setting ownership of $ISORESULTDIR/$NEWISONAME...."
+chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR"/$NEWISONAME
+echo -e "Setting ownership of $ISORESULTDIR...."
+chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR"
+echo -e "Setting ownership of $ISORESULTDIR...."
+chown "$SUDO_UID":"$SUDO_GID" "$ISOTMPMNT"
+echo -e "Setting ownership of ssh key files...."
+chown "$SUDO_UID":"$SUDO_GID" "$SRCDIR"/*.id_rsa "$SRCDIR"/*.pub
 
 # Clean up work directory
+echo -e "Cleaning up $WORKDIR....\n"
 rm -rf $WORKDIR
+
+# Notify we're done here
+echo -e "\n$0 total run time was:"
+printf '%dd:%dh:%dm:%ds\n' $((SECONDS/86400)) $((SECONDS%86400/3600)) $((SECONDS%3600/60)) \ $((SECONDS%60))
+echo -e "\n$0 completed with exit code: $?\n"
