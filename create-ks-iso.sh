@@ -71,13 +71,25 @@ mkdir -p "$WORKDIR"
 #######################
 
 # User Variables
+#
+# Philosophy here is to add two accounts: One Ansible service account and one "break glass"
+# emergency admin account.
+
+# Much of this obviously could be improved in terms of code reuse, perhaps using arrays and loops, but this an MVP for now.
+
+# Ansible Service Account
 : "${username_01:=svc.ansible}" # Default if not defined
 : "${username_01_gecos:=Ansible Service Account}" # Default if not defined 
 
+# "Break Glass" Emergency Admin Account
+: "${username_02:=alt.admin}" # Default if not defined
+: "${username_02_gecos:=Emergency Admin Account}" # Default if not defined 
+
 # Define or Generate Passwords and ssh keys
 
-# Generate a random password of 36 characters using python
-password=$(python3 -c 'import sys; import random; import string; print("".join(random.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' 36)
+# Generate passwords of 16 characters using python if not defined
+# Change the number at the end of the python-one liner to set password length
+: "${password:=$(python3 -c 'import sys; import random; import string; print("".join(random.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' 16)}"
 
 # Write password to file
 echo "$password" > password.txt
@@ -122,6 +134,7 @@ bootloader --iscrypted --password=$grub2_password
 #     alt.admin can login remotely. 
 #     Direct root login is only allowed from console.
 user --name=$username_01 --groups=wheel --gecos='$username_01_gecos' --password=$encrypted_password --iscrypted
+user --name=$username_02 --groups=wheel --gecos='$username_02_gecos' --password=$encrypted_password --iscrypted
 
 # sshkey (optional)
 # Adds SSH key to the authorized_keys file of the specified user
