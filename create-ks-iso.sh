@@ -87,26 +87,42 @@ mkdir -p "$WORKDIR"
 
 # Define or Generate Passwords and ssh keys
 
-# Generate passwords of 16 characters using python if not defined
+# Password length
+: "${passwd_len:=16}" # Default if not defined
+
+# Generate passwords of either $passwd_len or a default 16 characters using python if not defined
 # Change the number at the end of the python-one liner to set password length
-: "${password:=$(python3 -c 'import sys; import random; import string; print("".join(random.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' 16)}"
+: "${password:=$(python3 -c 'import sys; import random; import string; print("".join(random.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' "$passwd_len")}"
+: "${password_username_01:=$(python3 -c 'import sys; import random; import string; print("".join(random.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' "$passwd_len")}"
+: "${password_username_02:=$(python3 -c 'import sys; import random; import string; print("".join(random.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' "$passwd_len")}"
 
-# Write password to file
+# Write passwords to files for testing/pipeline use (Obviously insecure, don't do this!)
 echo "$password" > password.txt
+echo "$password_username_01" > password_"${username_01}".txt
+echo "$password_username_02" > password_"${username_02}".txt
 
-# Encrypt the password using python with a FIPS-compliant cypher
-encrypted_password=$(python3 -c 'import crypt,getpass; print(crypt.crypt("$password", crypt.mksalt(crypt.METHOD_SHA512)))')
+# Encrypt the passwords using python with a FIPS-compliant cypher
+encrypted_password=$(python3 -c "import crypt,getpass; print(crypt.crypt('{$password}', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "root password generation ERROR, exiting..."; exit 1; }
+encrypted_password_username_01=$(python3 -c "import crypt,getpass; print(crypt.crypt('$password_username_01', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "Password generation ERROR, exiting..."; exit 1; }
+encrypted_password_username_02=$(python3 -c "import crypt,getpass; print(crypt.crypt('$password_username_02', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "Password generation ERROR, exiting..."; exit 1; }
 
 # Generate grub2 bootloader password, unfortunately the grub2-mkpasswd-pbkdf2
 # command is interactive-only, so we have to emulate the keypresses:
 grub2_password=$(echo -e "$password\n$password" | grub2-mkpasswd-pbkdf2 | awk '/grub.pbkdf/{print$NF}') || { echo "Grub password generation ERROR, exiting..."; exit 1; }
 
+# Generate a 64-character random disk encryption password
+random_luks_passwd=$(python3 -c 'import sys; import random; import string; print("".join(random.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' 64)
+
 # Remove old randomly-generated ssh keys
 rm -f "$SRCDIR"/*.id_rsa "$SRCDIR"/*.pub
 
-# Create ssh key pair
-ssh-keygen -t ecdsa-sha2-nistp521 -b 521 -N "" -f "$SRCDIR"/svc.ansible.id_rsa -q -C "kickstart-generated bootstrapping key"
-ssh_pub_key=$(<svc.ansible.id_rsa.pub)
+# Create ssh key pair for user 1 (Ansible Service Account)
+ssh-keygen -t ecdsa-sha2-nistp521 -b 521 -N "" -f "$SRCDIR"/"${username_01}".id_rsa -q -C "${username_01} kickstart-generated bootstrapping key"
+ssh_pub_key_username_01=$(<"${username_01}".id_rsa.pub)
+
+# Create ssh key pairt for user 2 (Emergency Admin Account)
+ssh-keygen -t ecdsa-sha2-nistp521 -b 521 -N "" -f "$SRCDIR"/"${username_02}".id_rsa -q -C "${username_02} kickstart-generated bootstrapping key"
+ssh_pub_key_username_02=$(<"${username_02}".id_rsa.pub)
 
 # Check for required root privileges
 if [ "$EUID" -ne 0 ]
@@ -133,13 +149,54 @@ bootloader --iscrypted --password=$grub2_password
 #     alt.admin is "break glass" alternate emergency account
 #     alt.admin can login remotely. 
 #     Direct root login is only allowed from console.
-user --name=$username_01 --groups=wheel --gecos='$username_01_gecos' --password=$encrypted_password --iscrypted
-user --name=$username_02 --groups=wheel --gecos='$username_02_gecos' --password=$encrypted_password --iscrypted
+user --name=$username_01 --groups=wheel --gecos='$username_01_gecos' --password=$encrypted_password_username_01 --iscrypted
+user --name=$username_02 --groups=wheel --gecos='$username_02_gecos' --password=$encrypted_password_username_02 --iscrypted
 
 # sshkey (optional)
 # Adds SSH key to the authorized_keys file of the specified user
 # sshkey --username=user "ssh_key"
-sshkey --username=$username_01 "$ssh_pub_key"
+sshkey --username=$username_01 "$ssh_pub_key_username_01"
+sshkey --username=$username_02 "$ssh_pub_key_username_02"
+
+# Create encrypted LVM pv with all available disk space
+partition pv.01 --fstype='lvmpv' --grow --size=1 --encrypted --luks-version=luks2 --passphrase=$random_luks_passwd
+
+%post
+# Allow provisioning account to sudo without password for initial 
+# systems configuration. Should be removed after system is 
+# provisioned and deployed.
+cat >> /etc/sudoers.d/provisioning << EOF_sudoers
+### Allow these accounts sudo access with no password until system fully deployed ###
+# This should be temporary and removed after full provisioning of the system
+$username_01      ALL=(ALL)       NOPASSWD: ALL
+$username_02      ALL=(ALL)       NOPASSWD: ALL
+EOF_sudoers
+chown root:root /etc/sudoers.d/provisioning
+chmod 0440 /etc/sudoers.d/provisioning
+
+# Allow luks auto-decryption for root pv.01
+LUKSDEV="/dev/sda3"
+
+# Create a [long] random key and place it in file
+dd bs=512 count=4 if=/dev/urandom of=/crypto_keyfile.bin
+
+# Add the keyfile as a valid unlock password for /
+# NOTE: This must match the passphrase used in the pv partition line above
+echo \"$random_luks_passwd\" | cryptsetup luksAddKey $LUKSDEV /crypto_keyfile.bin
+
+# Configure dracut to include this keyfile in the initramfs
+mkdir -p /etc/dracut.conf.d
+echo 'install_items+=" /crypto_keyfile.bin"' > /etc/dracut.conf.d/include_cryptokey.conf
+
+# Configure crypttab to look for the keyfile to auto-unlock all volumes (will use the version stored in the initramfs)
+sed -i "s#\bnone\b#/crypto_keyfile.bin#" /etc/crypttab
+
+# Rebuild the initramfs
+dracut -f
+
+# Lock everyone out of the keyfile
+chmod 000 /crypto_keyfile.bin
+%end
 EOF
 
 # Mount OEM Install Media ISO
@@ -196,6 +253,9 @@ echo -e "Setting ownership of $ISORESULTDIR...."
 chown "$SUDO_UID":"$SUDO_GID" "$ISOTMPMNT"
 echo -e "Setting ownership of ssh key files...."
 chown "$SUDO_UID":"$SUDO_GID" "$SRCDIR"/*.id_rsa "$SRCDIR"/*.pub
+echo -e "Setting ownership and permissions of password files...."
+chown "$SUDO_UID":"$SUDO_GID" "$SRCDIR"/password*.txt
+chmod 600 "$SRCDIR"/password*.txt
 
 # Clean up work directory
 echo -e "Cleaning up $WORKDIR....\n"
