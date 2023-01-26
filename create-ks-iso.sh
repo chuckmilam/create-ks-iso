@@ -87,7 +87,7 @@ encrypted_password=$(python3 -c 'import crypt,getpass; print(crypt.crypt("$passw
 
 # Generate grub2 bootloader password, unfortunately the grub2-mkpasswd-pbkdf2
 # command is interactive-only, so we have to emulate the keypresses:
-grub2_password=$(echo -e "$password\n$password" | grub2-mkpasswd-pbkdf2 | awk '/grub.pbkdf/{print$NF}')
+grub2_password=$(echo -e "$password\n$password" | grub2-mkpasswd-pbkdf2 | awk '/grub.pbkdf/{print$NF}') || { echo "Grub password generation ERROR, exiting..."; exit 1; }
 
 # Remove old randomly-generated ssh keys
 rm -f "$SRCDIR"/*.id_rsa "$SRCDIR"/*.pub
