@@ -65,7 +65,6 @@ WORKDIRNAME="iso-workdir"
 WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 # Create scratch space directory
 mkdir -p "$WORKDIR"
-<<<<<<< HEAD
 
 #######################
 # Kickstart variables #
@@ -77,15 +76,6 @@ mkdir -p "$WORKDIR"
 
 # Define or Generate Passwords and ssh keys
 
-=======
-
-#######################
-# Kickstart variables #
-#######################
-
-# Define or Generate Passwords and ssh keys
-
->>>>>>> 33f7ffd (initial commit)
 # Generate a random password of 36 characters using python
 password=$(python3 -c 'import sys; import random; import string; print("".join(random.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' 36)
 
