@@ -70,6 +70,10 @@ mkdir -p "$WORKDIR"
 # Kickstart variables #
 #######################
 
+# User Variables
+: "${username_01:=svc.ansible}" # Default if not defined
+: "${username_01_gecos:=Ansible Service Account}" # Default if not defined 
+
 # Define or Generate Passwords and ssh keys
 
 # Generate a random password of 36 characters using python
@@ -117,12 +121,12 @@ bootloader --iscrypted --password=$grub2_password
 #     alt.admin is "break glass" alternate emergency account
 #     alt.admin can login remotely. 
 #     Direct root login is only allowed from console.
-user --name=svc.ansible --groups=wheel --gecos='Ansible Service Account' --password=$encrypted_password --iscrypted
+user --name=$username_01 --groups=wheel --gecos='$username_01_gecos' --password=$encrypted_password --iscrypted
 
 # sshkey (optional)
 # Adds SSH key to the authorized_keys file of the specified user
 # sshkey --username=user "ssh_key"
-sshkey --username=svc.ansible "$ssh_pub_key"
+sshkey --username=$username_01 "$ssh_pub_key"
 EOF
 
 # Mount OEM Install Media ISO
