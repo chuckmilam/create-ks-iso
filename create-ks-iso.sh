@@ -92,9 +92,9 @@ mkdir -p "$WORKDIR"
 
 # If passwords not defined, generate passwords of either $passwd_len or a default 16 characters using python
 # Change the number at the end of the python-one liner to set password length
-: "${password:=$(python3 -c 'import sys; import secrets; import string; print("".join(secrets.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' "$passwd_len")}"
-: "${password_username_01:=$(python3 -c 'import sys; import secrets; import string; print("".join(secrets.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' "$passwd_len")}"
-: "${password_username_02:=$(python3 -c 'import sys; import secrets; import string; print("".join(secrets.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' "$passwd_len")}"
+: "${password:=$(passwd_len=$passwd_len python3 -c 'import os; import sys; import secrets; import string; print("".join(secrets.token_urlsafe(int(os.environ["passwd_len"]))))')}" || { echo "root password generation ERROR, exiting..."; exit 1; }
+: "${password_username_01:=$(passwd_len=$passwd_len python3 -c 'import os; import sys; import secrets; import string; print("".join(secrets.token_urlsafe(int(os.environ["passwd_len"]))))')}" || { echo "$username_01 password generation ERROR, exiting..."; exit 1; }
+: "${password_username_02:=$(passwd_len=$passwd_len python3 -c 'import os; import sys; import secrets; import string; print("".join(secrets.token_urlsafe(int(os.environ["passwd_len"]))))')}" || { echo "$username_02 generation ERROR, exiting..."; exit 1; }
 
 # Write passwords to files for testing/pipeline use (Obviously insecure, don't do this!)
 echo "$password" > password.txt
@@ -102,9 +102,9 @@ echo "$password_username_01" > password_"${username_01}".txt
 echo "$password_username_02" > password_"${username_02}".txt
 
 # Encrypt the passwords using python with a FIPS-compliant cypher
-encrypted_password=$(python3 -c "import crypt,getpass; print(crypt.crypt('{$password}', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "root password generation ERROR, exiting..."; exit 1; }
-encrypted_password_username_01=$(python3 -c "import crypt,getpass; print(crypt.crypt('{$password_username_01}', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "Password generation ERROR, exiting..."; exit 1; }
-encrypted_password_username_02=$(python3 -c "import crypt,getpass; print(crypt.crypt('{$password_username_02}', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "Password generation ERROR, exiting..."; exit 1; }
+encrypted_password=$(python3 -c "import crypt,getpass; print(crypt.crypt('{$password}', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "root password encryption ERROR, exiting..."; exit 1; }
+encrypted_password_username_01=$(python3 -c "import crypt,getpass; print(crypt.crypt('{$password_username_01}', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "Password encryption ERROR, exiting..."; exit 1; }
+encrypted_password_username_02=$(python3 -c "import crypt,getpass; print(crypt.crypt('{$password_username_02}', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "Password encryption ERROR, exiting..."; exit 1; }
 
 # Generate grub2 bootloader password, unfortunately the grub2-mkpasswd-pbkdf2
 # command is interactive-only, so we have to emulate the keypresses:
