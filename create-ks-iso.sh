@@ -90,11 +90,11 @@ mkdir -p "$WORKDIR"
 # Password length
 : "${passwd_len:=16}" # Default if not defined
 
-# Generate passwords of either $passwd_len or a default 16 characters using python if not defined
+# If passwords not defined, generate passwords of either $passwd_len or a default 16 characters using python
 # Change the number at the end of the python-one liner to set password length
-: "${password:=$(python3 -c 'import sys; import random; import string; print("".join(random.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' "$passwd_len")}"
-: "${password_username_01:=$(python3 -c 'import sys; import random; import string; print("".join(random.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' "$passwd_len")}"
-: "${password_username_02:=$(python3 -c 'import sys; import random; import string; print("".join(random.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' "$passwd_len")}"
+: "${password:=$(python3 -c 'import sys; import secrets; import string; print("".join(secrets.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' "$passwd_len")}"
+: "${password_username_01:=$(python3 -c 'import sys; import secrets; import string; print("".join(secrets.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' "$passwd_len")}"
+: "${password_username_02:=$(python3 -c 'import sys; import secrets; import string; print("".join(secrets.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' "$passwd_len")}"
 
 # Write passwords to files for testing/pipeline use (Obviously insecure, don't do this!)
 echo "$password" > password.txt
@@ -103,15 +103,18 @@ echo "$password_username_02" > password_"${username_02}".txt
 
 # Encrypt the passwords using python with a FIPS-compliant cypher
 encrypted_password=$(python3 -c "import crypt,getpass; print(crypt.crypt('{$password}', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "root password generation ERROR, exiting..."; exit 1; }
-encrypted_password_username_01=$(python3 -c "import crypt,getpass; print(crypt.crypt('$password_username_01', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "Password generation ERROR, exiting..."; exit 1; }
-encrypted_password_username_02=$(python3 -c "import crypt,getpass; print(crypt.crypt('$password_username_02', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "Password generation ERROR, exiting..."; exit 1; }
+encrypted_password_username_01=$(python3 -c "import crypt,getpass; print(crypt.crypt('{$password_username_01}', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "Password generation ERROR, exiting..."; exit 1; }
+encrypted_password_username_02=$(python3 -c "import crypt,getpass; print(crypt.crypt('{$password_username_02}', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "Password generation ERROR, exiting..."; exit 1; }
 
 # Generate grub2 bootloader password, unfortunately the grub2-mkpasswd-pbkdf2
 # command is interactive-only, so we have to emulate the keypresses:
 grub2_password=$(echo -e "$password\n$password" | grub2-mkpasswd-pbkdf2 | awk '/grub.pbkdf/{print$NF}') || { echo "Grub password generation ERROR, exiting..."; exit 1; }
 
-# Generate a 64-character random disk encryption password
-random_luks_passwd=$(python3 -c 'import sys; import random; import string; print("".join(random.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(int(sys.argv[1]))))' 64)
+# Generate a 12-character random disk encryption password
+random_luks_passwd=$(python3 -c 'import sys; import secrets; import string; print("".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(int(sys.argv[1]))))' 12)
+
+# Allow luks auto-decryption for root pv.01
+LUKSDEV="/dev/sda3"
 
 # Remove old randomly-generated ssh keys
 rm -f "$SRCDIR"/*.id_rsa "$SRCDIR"/*.pub
@@ -174,15 +177,12 @@ EOF_sudoers
 chown root:root /etc/sudoers.d/provisioning
 chmod 0440 /etc/sudoers.d/provisioning
 
-# Allow luks auto-decryption for root pv.01
-LUKSDEV="/dev/sda3"
-
 # Create a [long] random key and place it in file
 dd bs=512 count=4 if=/dev/urandom of=/crypto_keyfile.bin
 
 # Add the keyfile as a valid unlock password for /
-# NOTE: This must match the passphrase used in the pv partition line above
-echo \"$random_luks_passwd\" | cryptsetup luksAddKey $LUKSDEV /crypto_keyfile.bin
+# NOTE: This string must match the passphrase used for the pv partition line above
+echo "$random_luks_passwd" | cryptsetup luksAddKey $LUKSDEV /crypto_keyfile.bin
 
 # Configure dracut to include this keyfile in the initramfs
 mkdir -p /etc/dracut.conf.d
