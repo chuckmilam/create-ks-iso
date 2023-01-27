@@ -102,9 +102,9 @@ echo "$password_username_01" > password_"${username_01}".txt
 echo "$password_username_02" > password_"${username_02}".txt
 
 # Encrypt the passwords using python with a FIPS-compliant cypher
-encrypted_password=$(python3 -c "import crypt,getpass; print(crypt.crypt('{$password}', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "root password encryption ERROR, exiting..."; exit 1; }
-encrypted_password_username_01=$(python3 -c "import crypt,getpass; print(crypt.crypt('{$password_username_01}', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "$username_01 password encryption ERROR, exiting..."; exit 1; }
-encrypted_password_username_02=$(python3 -c "import crypt,getpass; print(crypt.crypt('{$password_username_02}', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "$username_02 password encryption ERROR, exiting..."; exit 1; }
+encrypted_password=$(python3 -c "import crypt,getpass; print(crypt.crypt('$password', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "root password encryption ERROR, exiting..."; exit 1; }
+encrypted_password_username_01=$(python3 -c "import crypt,getpass; print(crypt.crypt('$password_username_01', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "$username_01 password encryption ERROR, exiting..."; exit 1; }
+encrypted_password_username_02=$(python3 -c "import crypt,getpass; print(crypt.crypt('$password_username_02', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "$username_02 password encryption ERROR, exiting..."; exit 1; }
 
 # Generate grub2 bootloader password, unfortunately the grub2-mkpasswd-pbkdf2
 # command is interactive-only, so we have to emulate the keypresses:
