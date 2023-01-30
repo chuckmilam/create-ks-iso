@@ -87,31 +87,50 @@ mkdir -p "$WORKDIR"
 # Define or Generate Passwords and ssh keys
 
 # Password length
+# Note: The python secrets module output is Base64 encoded, so on average each byte 
+# results in approximately 1.3 characters. 
+# Source: https://docs.python.org/3/library/secrets.html
 : "${passwd_len:=16}" # Default if not defined
+
+########################
+# Function Definitions #
+########################
+
+generate_random_passwd () {
+  (passwd_len=$passwd_len python3 -c 'import os; import sys; import secrets; import string; print("".join(secrets.token_urlsafe(int(os.environ["passwd_len"]))))')
+}
+
+encrypt_random_passwd () {
+  (python3 -c "import crypt,getpass; print(crypt.crypt('$1', crypt.mksalt(crypt.METHOD_SHA512)))")
+}
 
 # If passwords not defined, generate passwords of either $passwd_len or a default 16 characters using python
 # Change the number at the end of the python-one liner to set password length
-: "${password:=$(passwd_len=$passwd_len python3 -c 'import os; import sys; import secrets; import string; print("".join(secrets.token_urlsafe(int(os.environ["passwd_len"]))))')}" || { echo "root password generation ERROR, exiting..."; exit 1; }
-: "${password_username_01:=$(passwd_len=$passwd_len python3 -c 'import os; import sys; import secrets; import string; print("".join(secrets.token_urlsafe(int(os.environ["passwd_len"]))))')}" || { echo "$username_01 password generation ERROR, exiting..."; exit 1; }
-: "${password_username_02:=$(passwd_len=$passwd_len python3 -c 'import os; import sys; import secrets; import string; print("".join(secrets.token_urlsafe(int(os.environ["passwd_len"]))))')}" || { echo "$username_02 password generation ERROR, exiting..."; exit 1; }
+: "${password:=$( generate_random_passwd )}" || { echo "root password generation ERROR, exiting..."; exit 1; }
+: "${password_username_01:=$( generate_random_passwd )}" || { echo "$username_01 password generation ERROR, exiting..."; exit 1; }
+: "${password_username_02:=$( generate_random_passwd )}" || { echo "$username_02 password generation ERROR, exiting..."; exit 1; }
+
+# grub2 bootloader password
+: "${grub2_passwd:=$( generate_random_passwd )}" || { echo "grub2 bootloader password generation ERROR, exiting..."; exit 1; }
 
 # Write passwords to files for testing/pipeline use 
 # Obviously insecure, don't do this for long-lived prod systems!
 echo "$password" > "$SRCDIR"/password.txt
 echo "$password_username_01" > "$SRCDIR"/password_"${username_01}".txt
 echo "$password_username_02" > "$SRCDIR"/password_"${username_02}".txt
+echo "$grub2_passwd" > "$SRCDIR"/password_grub2.txt
 
 # Encrypt the passwords using python with a FIPS-compliant cypher
-encrypted_password=$(python3 -c "import crypt,getpass; print(crypt.crypt('$password', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "root password encryption ERROR, exiting..."; exit 1; }
-encrypted_password_username_01=$(python3 -c "import crypt,getpass; print(crypt.crypt('$password_username_01', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "$username_01 password encryption ERROR, exiting..."; exit 1; }
-encrypted_password_username_02=$(python3 -c "import crypt,getpass; print(crypt.crypt('$password_username_02', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "$username_02 password encryption ERROR, exiting..."; exit 1; }
+encrypted_password=$( encrypt_random_passwd "$password" ) || { echo "root password encryption ERROR, exiting..."; exit 1; }
+encrypted_password_username_01=$( encrypt_random_passwd "$password_username_01"  ) || { echo "$username_01 password encryption ERROR, exiting..."; exit 1; }
+encrypted_password_username_02=$( encrypt_random_passwd "$password_username_02" ) || { echo "$username_02 password encryption ERROR, exiting..."; exit 1; }
 
 # Generate grub2 bootloader password, unfortunately the grub2-mkpasswd-pbkdf2
 # command is interactive-only, so we have to emulate the keypresses:
-grub2_password=$(echo -e "$password\n$password" | grub2-mkpasswd-pbkdf2 | awk '/grub.pbkdf/{print$NF}') || { echo "Grub password generation ERROR, exiting..."; exit 1; }
+grub2_encrypted_passwd=$(echo -e "$grub2_passwd\n$grub2_passwd" | grub2-mkpasswd-pbkdf2 | awk '/grub.pbkdf/{print$NF}') || { echo "Grub password generation ERROR, exiting..."; exit 1; }
 
-# Generate a 12-character random disk encryption password
-random_luks_passwd=$(python3 -c 'import sys; import secrets; import string; print("".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(int(sys.argv[1]))))' 12)
+# Generate a random disk encryption password
+random_luks_passwd=$( generate_random_passwd )
 
 # Allow luks auto-decryption for root pv.01
 # This comes into play in the post section, also assumes /dev/sda3 is where the root pv will be
@@ -128,7 +147,11 @@ ssh_pub_key_username_01=$(<"${username_01}".id_rsa.pub)
 ssh-keygen -t ecdsa-sha2-nistp521 -b 521 -N "" -f "$SRCDIR"/"${username_02}".id_rsa -q -C "${username_02} kickstart-generated bootstrapping key"
 ssh_pub_key_username_02=$(<"${username_02}".id_rsa.pub)
 
-# Check for required root privileges
+################
+# Main Section #
+################
+
+# Check for required root privileges, needed to mount and extract OEM ISO
 if [ "$EUID" -ne 0 ]
   then echo "This script requires root privileges for the \"mount\" command. Please run with sudo or su."
   exit
@@ -144,7 +167,7 @@ rootpw --iscrypted $encrypted_password
 
 # Specify how the bootloader should be installed (required)
 # This password hash must be generated by: grub2-mkpasswd-pbkdf2
-bootloader --iscrypted --password=$grub2_password
+bootloader --iscrypted --password=$grub2_encrypted_passwd
 
 # user (optional)
 #   User Notes:
@@ -236,7 +259,7 @@ cd $SRCDIR || { echo "Unable to change directory, exiting."; exit 1; }
 
 # Build UEFI bootable image
 echo -e "Making UEFI bootable image in $SCRATCHDIR/$SCRATCHISONAME....\n"
-isohybrid --uefi $SCRATCHDIR/$SCRATCHISONAME
+isohybrid --uefi $SCRATCHDIR/$SCRATCHISONAME 2> /dev/null # Suppress warning about more than 1024 cylinders
 
 # Implant a md5 checksum into the new ISO image
 echo -e "Implanting MD5 checksum into $SCRATCHISONAME:\n"
