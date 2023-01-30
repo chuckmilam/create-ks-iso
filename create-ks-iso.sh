@@ -3,9 +3,7 @@
 # Reference:  How to create a modified Red Hat Enterprise Linux ISO with kickstart file 
 #             or modified installation media? (https://access.redhat.com/solutions/60959)
 
-# Required packages: isomd5sum, syslinux, genisoimage
-
-
+# Required packages: isomd5sum, syslinux, genisoimage, python
 
 ############################
 ## ISO Creation Variables ##
@@ -66,6 +64,7 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 # Create scratch space directory
 mkdir -p "$WORKDIR"
 
+
 #######################
 # Kickstart variables #
 #######################
@@ -96,10 +95,11 @@ mkdir -p "$WORKDIR"
 : "${password_username_01:=$(passwd_len=$passwd_len python3 -c 'import os; import sys; import secrets; import string; print("".join(secrets.token_urlsafe(int(os.environ["passwd_len"]))))')}" || { echo "$username_01 password generation ERROR, exiting..."; exit 1; }
 : "${password_username_02:=$(passwd_len=$passwd_len python3 -c 'import os; import sys; import secrets; import string; print("".join(secrets.token_urlsafe(int(os.environ["passwd_len"]))))')}" || { echo "$username_02 password generation ERROR, exiting..."; exit 1; }
 
-# Write passwords to files for testing/pipeline use (Obviously insecure, don't do this!)
-echo "$password" > password.txt
-echo "$password_username_01" > password_"${username_01}".txt
-echo "$password_username_02" > password_"${username_02}".txt
+# Write passwords to files for testing/pipeline use 
+# Obviously insecure, don't do this for long-lived prod systems!
+echo "$password" > "$SRCDIR"/password.txt
+echo "$password_username_01" > "$SRCDIR"/password_"${username_01}".txt
+echo "$password_username_02" > "$SRCDIR"/password_"${username_02}".txt
 
 # Encrypt the passwords using python with a FIPS-compliant cypher
 encrypted_password=$(python3 -c "import crypt,getpass; print(crypt.crypt('$password', crypt.mksalt(crypt.METHOD_SHA512)))") || { echo "root password encryption ERROR, exiting..."; exit 1; }
@@ -114,6 +114,7 @@ grub2_password=$(echo -e "$password\n$password" | grub2-mkpasswd-pbkdf2 | awk '/
 random_luks_passwd=$(python3 -c 'import sys; import secrets; import string; print("".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(int(sys.argv[1]))))' 12)
 
 # Allow luks auto-decryption for root pv.01
+# This comes into play in the post section, also assumes /dev/sda3 is where the root pv will be
 LUKSDEV="/dev/sda3"
 
 # Remove old randomly-generated ssh keys
@@ -134,10 +135,10 @@ if [ "$EUID" -ne 0 ]
 fi
 
 # Copy ks.cfg from template file
-cp ks-template.cfg ks.cfg
+cp "$SRCDIR"/ks-template.cfg "$SRCDIR"/ks.cfg
 
 # Append required lines to kickstart file (ks.cfg)
-cat << EOF >> ks.cfg
+cat << EOF >> "$SRCDIR"/ks.cfg
 # Set the system's root password (required)
 rootpw --iscrypted $encrypted_password
 
@@ -203,7 +204,8 @@ EOF
 mount -o ro $ISOSRCDIR/$OEMSRCISO $ISOTMPMNT
 
 # Extract the ISO image into a working directory
-shopt -s dotglob
+echo -e "Extracting $OEMSRCISO image into $WORKDIR....\n"
+shopt -s dotglob # Be sure to grab dotfiles also
 cp -aRf $ISOTMPMNT/* $WORKDIR
 
 # Unmount the OEM ISO
