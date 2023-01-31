@@ -69,12 +69,9 @@ mkdir -p "$WORKDIR"
 # Kickstart variables #
 #######################
 
-# User Variables
-#
-# Philosophy here is to add two accounts: One Ansible service account and one "break glass"
-# emergency admin account.
-
-# Much of this obviously could be improved in terms of code reuse, perhaps using arrays and loops, but this an MVP for now.
+## User Account Variables
+# Philosophy here is to add two bootstrap accounts: One Ansible service account and 
+# one "break glass" emergency admin account.
 
 # Ansible Service Account
 : "${username_01:=svc.ansible}" # Default if not defined
@@ -86,7 +83,7 @@ mkdir -p "$WORKDIR"
 
 # Define or Generate Passwords and ssh keys
 
-# Password length
+# Password length in bytes 
 # Note: The python secrets module output is Base64 encoded, so on average each byte 
 # results in approximately 1.3 characters. 
 # Source: https://docs.python.org/3/library/secrets.html
@@ -101,7 +98,7 @@ generate_random_passwd () {
 }
 
 encrypt_random_passwd () {
-  (python3 -c "import crypt,getpass; print(crypt.crypt('$1', crypt.mksalt(crypt.METHOD_SHA512)))")
+  (python3 -c "import crypt,getpass; print(crypt.crypt('$1', crypt.mksalt(crypt.METHOD_SHA512)))") # SHA512 should be FIPS-compliant
 }
 
 # If passwords not defined, generate passwords of either $passwd_len or a default 16 characters using python
