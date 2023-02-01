@@ -12,8 +12,7 @@
 # Source files for implantation into new ISO (ks.cfg, etc.)
 # This needs to be an absolute path, not a relative path.
 # Also serves as the base for all relative paths defined below.
-# Default is pwd 
-SRCDIR="${SRCDIR:=${PWD}}"
+SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 
 # Source CONFIG_FILE for variables
 . "$SRCDIR/CONFIG_FILE"
@@ -35,19 +34,22 @@ fi
 mkdir -p "$ISORESULTDIR"
 
 # OEM Source Media File Name
-OEMSRCISO="CentOS-Stream-9-latest-x86_64-dvd1.iso"
+: "${OEMSRCISO:=CentOS-Stream-9-latest-x86_64-dvd1.iso}" # Default if not defined
+
+# New ISO file prefix
+: "${NEWISONAMEPREFIX:=Random_Creds-}" # Default if not defined
 
 # File Name for newly-created final ISO file
-NEWISONAME="Random_Creds-CentOS-Stream-9-latest-x86_64-dvd1.iso"
+: "${NEWISONAME:=$NEWISONAMEPREFIX$OEMSRCISO}" # Default if not defined
 
 # Source kickstart config file, locate in $SRCDIR
-KSCFGSRCFILE="ks.cfg"
+: "${KSCFGSRCFILE:=ks.cfg}" # Default if not defined
 
-# Do not change this, some Red Hat internals look for this specific name
-KSCFGDESTFILENAME="ks.cfg"
+# Best to not change this, some Red Hat internals look for this specific name
+: "${KSCFGDESTFILENAME:=ks.cfg}" # Default if not defined
 
 # ISO Volume Name must match or boot will fail
-OEMSRCISOVOLNAME=$(blkid -o value $ISOSRCDIR/$OEMSRCISO | sed -n 3p)
+OEMSRCISOVOLNAME=$(blkid -o value "$ISOSRCDIR"/$OEMSRCISO | sed -n 3p)
 
 # Temporary mount point for OEM Source Media
 ISOTMPMNT="$SRCDIR/mnt/iso"
@@ -55,6 +57,7 @@ ISOTMPMNT="$SRCDIR/mnt/iso"
 # Create temporary mount point for OEM Source Media if it does not exist
 mkdir -p "$ISOTMPMNT"
 
+# No need to change this, not a permanent file
 SCRATCHISONAME="NEWISO.iso"
 
 # Ensure these directories are mounted where 4GB+ files are allowed, /tmp may not support this
@@ -70,7 +73,7 @@ mkdir -p "$WORKDIR"
 #######################
 
 ## User Account Variables
-# Philosophy here is to add two bootstrap accounts: One Ansible service account and 
+# Create two bootstrap accounts: One Ansible service account and 
 # one "break glass" emergency admin account.
 
 # Ansible Service Account
@@ -123,7 +126,7 @@ encrypted_password_username_01=$( encrypt_random_passwd "$password_username_01" 
 encrypted_password_username_02=$( encrypt_random_passwd "$password_username_02" ) || { echo "$username_02 password encryption ERROR, exiting..."; exit 1; }
 
 # Generate grub2 bootloader password, unfortunately the grub2-mkpasswd-pbkdf2
-# command is interactive-only, so we have to emulate the keypresses:
+# command is interactive, so we have to emulate the keypresses:
 grub2_encrypted_passwd=$(echo -e "$grub2_passwd\n$grub2_passwd" | grub2-mkpasswd-pbkdf2 | awk '/grub.pbkdf/{print$NF}') || { echo "Grub password generation ERROR, exiting..."; exit 1; }
 
 # Generate a random disk encryption password
