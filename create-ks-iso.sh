@@ -104,6 +104,10 @@ encrypt_random_passwd () {
   (python3 -c "import crypt,getpass; print(crypt.crypt('$1', crypt.mksalt(crypt.METHOD_SHA512)))") # SHA512 should be FIPS-compliant
 }
 
+generate_ssh_keys () { 
+  ssh-keygen -t ecdsa-sha2-nistp521 -b 521 -N "" -f "$SRCDIR"/"${1}".id_rsa -q -C "${1} kickstart-generated bootstrapping key"
+}
+
 # If passwords not defined, generate passwords of either $passwd_len or a default 16 characters using python
 # Change the number at the end of the python-one liner to set password length
 : "${password:=$( generate_random_passwd )}" || { echo "root password generation ERROR, exiting..."; exit 1; }
@@ -140,11 +144,11 @@ LUKSDEV="/dev/sda3"
 rm -f "$SRCDIR"/*.id_rsa "$SRCDIR"/*.pub
 
 # Create ssh key pair for user 1 (Ansible Service Account)
-ssh-keygen -t ecdsa-sha2-nistp521 -b 521 -N "" -f "$SRCDIR"/"${username_01}".id_rsa -q -C "${username_01} kickstart-generated bootstrapping key"
+generate_ssh_keys "$username_01"
 ssh_pub_key_username_01=$(<"${username_01}".id_rsa.pub)
 
 # Create ssh key pairt for user 2 (Emergency Admin Account)
-ssh-keygen -t ecdsa-sha2-nistp521 -b 521 -N "" -f "$SRCDIR"/"${username_02}".id_rsa -q -C "${username_02} kickstart-generated bootstrapping key"
+generate_ssh_keys "$username_02"
 ssh_pub_key_username_02=$(<"${username_02}".id_rsa.pub)
 
 ################
