@@ -9,5 +9,8 @@
 # Source Media ISO Location
 #ISOSRCDIR=""
 
+# FIPS Mode
+#ENABLEFIPS="true"
+
 # Root password
 password="Password1234"
