@@ -19,4 +19,4 @@ CREATEOEMDRVISO="true"
 #ENABLEFIPS="true"
 
 # Root password
-#password="Password1234"
+#password=""
