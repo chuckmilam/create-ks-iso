@@ -9,6 +9,12 @@
 # Source Media ISO Location
 #ISOSRCDIR=""
 
+# Create new full boot ISO
+CREATEBOOTISO="true"
+
+# Create OEMDRV volume ISO
+CREATEOEMDRVISO="true"
+
 # FIPS Mode
 #ENABLEFIPS="true"
 

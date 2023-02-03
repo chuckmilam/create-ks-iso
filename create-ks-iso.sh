@@ -17,21 +17,26 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 # Source CONFIG_FILE for variables
 . "$SRCDIR/CONFIG_FILE"
 
+# Create new full boot ISO
+: "${CREATEBOOTISO:=false}" # Default if not defined
+
+# Create OEMDRV volume ISO
+: "${CREATEOEMDRVISO:=false}" # Default if not defined
+
+# OEMDRV volume ISO source directory
+: "${OEMDRVDIR:=$SRCDIR/oemdrv}" # Default if not defined
+
+# OEMDRV ISO File Name
+: "${OEMDRVISOFILENAME:=OEMDRV}" # Default if not defined
+
+# Location for generated credentials
+: "${CREDSDIR:=$SRCDIR/creds}" # Default if not defined
+
 # Source Media ISO Location
 : "${ISOSRCDIR:=$SRCDIR/isosrc}" # Default if not defined
 
-# Exit if ISO source location does not exist
-# Note: Don't create this automatically to avoid potentially clobbering a large ISO store
-if [[ ! -d "$ISOSRCDIR" ]] || [[ ! -h "$ISOSRCDIR" ]]; then
-  echo "ISO source directory not found, please correct. Exiting."
-  exit 1
-fi
-
 # ISO Result/Output Location
 : "${ISORESULTDIR:=$SRCDIR/result}" # Default if not defined
-
-# Create ISO Result Location if it does not exist
-mkdir -p "$ISORESULTDIR"
 
 # OEM Source Media File Name
 : "${OEMSRCISO:=CentOS-Stream-9-latest-x86_64-dvd1.iso}" # Default if not defined
@@ -42,20 +47,14 @@ mkdir -p "$ISORESULTDIR"
 # File Name for newly-created final ISO file
 : "${NEWISONAME:=$NEWISONAMEPREFIX$OEMSRCISO}" # Default if not defined
 
-# Source kickstart config file, locate in $SRCDIR
+# Kickstart config file, locate in $SRCDIR
 : "${KSCFGSRCFILE:=ks.cfg}" # Default if not defined
 
 # Best to not change this, some Red Hat internals look for this specific name
 : "${KSCFGDESTFILENAME:=ks.cfg}" # Default if not defined
 
-# ISO Volume Name must match or boot will fail
-OEMSRCISOVOLNAME=$(blkid -o value "$ISOSRCDIR"/$OEMSRCISO | sed -n 3p)
-
 # Temporary mount point for OEM Source Media
 ISOTMPMNT="$SRCDIR/mnt/iso"
-
-# Create temporary mount point for OEM Source Media if it does not exist
-mkdir -p "$ISOTMPMNT"
 
 # No need to change this, not a permanent file
 SCRATCHISONAME="NEWISO.iso"
@@ -64,9 +63,9 @@ SCRATCHISONAME="NEWISO.iso"
 SCRATCHDIR="$SRCDIR/tmp"
 WORKDIRNAME="iso-workdir"
 WORKDIR=$SCRATCHDIR/$WORKDIRNAME
-# Create scratch space directory
-mkdir -p "$WORKDIR"
 
+# Create directory for creds if it does not exist
+mkdir -p "$CREDSDIR"
 
 #######################
 # Kickstart variables #
@@ -110,10 +109,10 @@ encrypt_random_passwd () {
 generate_ssh_keys () { 
   case $ENABLEFIPS in
   true)
-    ssh-keygen -t ecdsa-sha2-nistp521 -b 521 -N "" -f "$SRCDIR"/"${1}".id_rsa -q -C "${1} kickstart-generated bootstrapping key" # FIPS-compatible 
+    ssh-keygen -t ecdsa-sha2-nistp521 -b 521 -N "" -f "$CREDSDIR"/"${1}".id_rsa -q -C "${1} kickstart-generated bootstrapping key" # FIPS-compatible 
     ;;
   *)
-    ssh-keygen -N "" -f "$SRCDIR"/"${1}".id_rsa -q -C "${1} kickstart-generated bootstrapping key" # Non-FIPS system defaults
+    ssh-keygen -N "" -f "$CREDSDIR"/"${1}".id_rsa -q -C "${1} kickstart-generated bootstrapping key" # Non-FIPS system defaults
   esac
 }
 
@@ -126,12 +125,15 @@ generate_ssh_keys () {
 # grub2 bootloader password
 : "${grub2_passwd:=$( generate_random_passwd )}" || { echo "grub2 bootloader password generation ERROR, exiting..."; exit 1; }
 
+# Remove any old password files
+rm -f "$CREDSDIR"/password*.txt
+
 # Write passwords to files for testing/pipeline use 
 # Obviously insecure, don't do this for long-lived prod systems!
-echo "$password" > "$SRCDIR"/password.txt
-echo "$password_username_01" > "$SRCDIR"/password_"${username_01}".txt
-echo "$password_username_02" > "$SRCDIR"/password_"${username_02}".txt
-echo "$grub2_passwd" > "$SRCDIR"/password_grub2.txt
+echo "$password" > "$CREDSDIR"/password.txt
+echo "$password_username_01" > "$CREDSDIR"/password_"${username_01}".txt
+echo "$password_username_02" > "$CREDSDIR"/password_"${username_02}".txt
+echo "$grub2_passwd" > "$CREDSDIR"/password_grub2.txt
 
 # Encrypt the passwords using python with a FIPS-compliant cypher
 encrypted_password=$( encrypt_random_passwd "$password" ) || { echo "root password encryption ERROR, exiting..."; exit 1; }
@@ -150,25 +152,19 @@ random_luks_passwd=$( generate_random_passwd )
 LUKSDEV="/dev/sda3"
 
 # Remove old randomly-generated ssh keys
-rm -f "$SRCDIR"/*.id_rsa "$SRCDIR"/*.pub
+rm -f "$CREDSDIR"/*.id_rsa "$CREDSDIR"/*.pub
 
 # Create ssh key pair for user 1 (Ansible Service Account)
 generate_ssh_keys "$username_01"
-ssh_pub_key_username_01=$(<"${username_01}".id_rsa.pub)
+ssh_pub_key_username_01=$(<"$CREDSDIR/${username_01}".id_rsa.pub)
 
 # Create ssh key pairt for user 2 (Emergency Admin Account)
 generate_ssh_keys "$username_02"
-ssh_pub_key_username_02=$(<"${username_02}".id_rsa.pub)
+ssh_pub_key_username_02=$(<"$CREDSDIR/${username_02}".id_rsa.pub)
 
 ################
 # Main Section #
 ################
-
-# Check for required root privileges, needed to mount and extract OEM ISO
-if [ "$EUID" -ne 0 ]
-  then echo "This script requires root privileges for the \"mount\" command. Please run with sudo or su."
-  exit
-fi
 
 # Show startup on console
 echo -e "$0 starting at $(date)"
@@ -269,82 +265,127 @@ chmod 000 /crypto_keyfile.bin
 %end
 EOF
 
-# Mount OEM Install Media ISO
-mount -o ro "$ISOSRCDIR"/"$OEMSRCISO" "$ISOTMPMNT"
+if [ "$CREATEBOOTISO" = "true" ] || [ "$CREATEOEMDRVISO" = "true" ]; then
+  # Create ISO Result Location if it does not exist
+  mkdir -p "$ISORESULTDIR"
+fi
 
-# Extract the ISO image into a working directory
-echo -e "Extracting $OEMSRCISO image into $WORKDIR at $(date)"
-shopt -s dotglob # Be sure to grab dotfiles also
-cp -aRf "$ISOTMPMNT"/* "$WORKDIR"
+if [ "$CREATEBOOTISO" = "true" ]; then
+  # Check for required root privileges, needed to mount and extract OEM ISO
+  if [ "$EUID" -ne 0 ]
+    then echo "This script requires root privileges for the \"mount\" command. Please run with sudo or su."
+    exit
+  fi
 
-# Unmount the OEM ISO
-umount "$ISOTMPMNT"
+  # Exit if ISO source location does not exist
+  # Note: Don't create this automatically to avoid potentially clobbering a large ISO store
+  if [[ ! -d "$ISOSRCDIR" ]] || [[ ! -h "$ISOSRCDIR" ]]; then
+    echo "ISO source directory not found, please correct. Exiting."
+    exit 1
+  fi
 
-# Copy ks.cfg into working dir
-cp "$SRCDIR"/"$KSCFGSRCFILE" "$WORKDIR"/"$KSCFGDESTFILENAME"
+  # ISO Volume Name must match or boot will fail
+  OEMSRCISOVOLNAME=$(blkid -o value "$ISOSRCDIR"/$OEMSRCISO | sed -n 3p)
 
+  # Create temporary mount point for OEM Source Media if it does not exist
+  mkdir -p "$ISOTMPMNT"
 
-case $ENABLEFIPS in
-  true)
-  # Modify isolinux.cfg for FIPS mode and ks boot
-  sed -i '/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/isolinux/isolinux.cfg
-  # Modify isolinux.cfg menu title
-  sed -i 's/menu title Red/menu title RandomCreds FIPS Kickstart Install Red/' "$WORKDIR"/isolinux/isolinux.cfg
-  # Modify grub.cfg menu entries to show RandomCreds
-  sed -i 's/Install/RandomCreds FIPS Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
-  sed -i 's/Test/RandomCreds FIPS Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
-  # Modify grub.cfg for ks boot
-  sed -i '/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/EFI/BOOT/grub.cfg
-  ;;
-*)
-  # Modify isolinux.cfg ks boot
-  sed -i '/rescue/!s/ quiet/ inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/isolinux/isolinux.cfg
-  # Modify isolinux.cfg menu title
-  sed -i 's/menu title Red/menu title RandomCreds Kickstart Install Red/' "$WORKDIR"/isolinux/isolinux.cfg
-  # Modify grub.cfg menu entries to show RandomCreds
-  sed -i 's/Install/RandomCreds Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
-  sed -i 's/Test/RandomCreds Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
-  # Modify grub.cfg for ks boot
-  sed -i '/rescue/!s/ quiet/ inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/EFI/BOOT/grub.cfg
-esac
+  # Create scratch space directory
+  mkdir -p "$WORKDIR"
 
-# Create new ISO  
-# Note, the relative pathnames in the arguments to mkisofs are required, as per the man page:
-# "The pathname must be relative to the source path..."
-# This is why we do the rather ugly "cd" into the working dir below.
-cd "$WORKDIR" || { echo "Unable to change directory, exiting."; exit 1; }
-echo -e "Building new ISO image at $(date)."
-mkisofs -quiet -o ../$SCRATCHISONAME -b isolinux/isolinux.bin -J -R -l -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e images/efiboot.img -no-emul-boot -graft-points -joliet-long -V "$OEMSRCISOVOLNAME" .
-cd "$SRCDIR" || { echo "Unable to change directory, exiting."; exit 1; }
+  # Mount OEM Install Media ISO
+  mount -o ro "$ISOSRCDIR"/"$OEMSRCISO" "$ISOTMPMNT"
 
-# Build UEFI bootable image
-echo -e "Making $SCRATCHDIR/$SCRATCHISONAME UEFI bootable at $(date)"
-isohybrid --uefi "$SCRATCHDIR"/$SCRATCHISONAME 2> /dev/null # Suppress warning about more than 1024 cylinders
+  # Extract the ISO image into a working directory
+  echo -e "Extracting $OEMSRCISO image into $WORKDIR at $(date)"
+  shopt -s dotglob # Be sure to grab dotfiles also
+  cp -aRf "$ISOTMPMNT"/* "$WORKDIR"
 
-# Implant a md5 checksum into the new ISO image
-echo -e "Implanting MD5 checksum into $SCRATCHISONAME at $(date)"
-implantisomd5 "$SCRATCHDIR"/$SCRATCHISONAME
+  # Unmount the OEM ISO
+  umount "$ISOTMPMNT"
 
-# Move new iso to ISOs dir
-echo -e "Moving new $SCRATCHISONAME to result directory and renaming to $NEWISONAME at $(date)"
-mv "$SCRATCHDIR"/$SCRATCHISONAME "$ISORESULTDIR"/"$NEWISONAME"
+  # Copy ks.cfg into working dir
+  cp "$SRCDIR"/"$KSCFGSRCFILE" "$WORKDIR"/"$KSCFGDESTFILENAME"
 
-# Chown new ISO and other generated files (will be owned by root otherwise)
-echo -e "Setting ownership of $ISORESULTDIR"
-chown "$SUDO_UID":"$SUDO_GID" "$ISOTMPMNT"
-echo -e "Setting ownership of $ISORESULTDIR/$NEWISONAME"
-chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR"/"$NEWISONAME"
+  # Modify ISO boot menu and options
+  case $ENABLEFIPS in
+    true)
+    # Modify isolinux.cfg for FIPS mode and ks boot
+    sed -i '/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/isolinux/isolinux.cfg
+    # Modify isolinux.cfg menu title
+    sed -i 's/menu title Red/menu title RandomCreds FIPS Kickstart Install Red/' "$WORKDIR"/isolinux/isolinux.cfg
+    # Modify grub.cfg menu entries to show RandomCreds
+    sed -i 's/Install/RandomCreds FIPS Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
+    sed -i 's/Test/RandomCreds FIPS Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
+    # Modify grub.cfg for ks boot
+    sed -i '/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/EFI/BOOT/grub.cfg
+    ;;
+  *)
+    # Modify isolinux.cfg ks boot
+    sed -i '/rescue/!s/ quiet/ inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/isolinux/isolinux.cfg
+    # Modify isolinux.cfg menu title
+    sed -i 's/menu title Red/menu title RandomCreds Kickstart Install Red/' "$WORKDIR"/isolinux/isolinux.cfg
+    # Modify grub.cfg menu entries to show RandomCreds
+    sed -i 's/Install/RandomCreds Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
+    sed -i 's/Test/RandomCreds Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
+    # Modify grub.cfg for ks boot
+    sed -i '/rescue/!s/ quiet/ inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/EFI/BOOT/grub.cfg
+  esac
+
+  # Create new ISO  
+  # Note, the relative pathnames in the arguments to mkisofs are required, as per the man page:
+  # "The pathname must be relative to the source path..."
+  # This is why we do the rather ugly "cd" into the working dir below.
+  cd "$WORKDIR" || { echo "Unable to change directory, exiting."; exit 1; }
+  echo -e "Building new ISO image at $(date)."
+  mkisofs -quiet -o ../$SCRATCHISONAME -b isolinux/isolinux.bin -J -R -l -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e images/efiboot.img -no-emul-boot -graft-points -joliet-long -V "$OEMSRCISOVOLNAME" .
+  cd "$SRCDIR" || { echo "Unable to change directory, exiting."; exit 1; }
+
+  # Build UEFI bootable image
+  echo -e "Making $SCRATCHISONAME UEFI bootable at $(date)"
+  isohybrid --uefi "$SCRATCHDIR"/$SCRATCHISONAME 2> /dev/null # Suppress warning about more than 1024 cylinders
+
+  # Implant a md5 checksum into the new ISO image
+  echo -e "Implanting MD5 checksum into $SCRATCHISONAME at $(date)"
+  implantisomd5 "$SCRATCHDIR"/$SCRATCHISONAME
+
+  # Move new iso to ISOs dir
+  echo -e "Moving new $SCRATCHISONAME to result directory and renaming to $NEWISONAME at $(date)"
+  mv "$SCRATCHDIR"/$SCRATCHISONAME "$ISORESULTDIR"/"$NEWISONAME"
+
+  # Clean up work directory
+  echo -e "Cleaning up $WORKDIR at $(date)"
+  rm -rf "$WORKDIR"
+
+  # Chown new ISO and other generated files (will be owned by root otherwise)
+  echo -e "Setting ownership of $ISORESULTDIR"
+  chown "$SUDO_UID":"$SUDO_GID" "$ISOTMPMNT"
+  echo -e "Setting ownership of $ISORESULTDIR/$NEWISONAME"
+  chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR"/"$NEWISONAME"
+  if [[ -f "$ISORESULTDIR/$OEMDRVISOFILENAME.iso" ]]; then
+    chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR/$OEMDRVISOFILENAME.iso"
+  fi
+  ## End Boot ISO Creation Section
+fi
+
+if [ "$CREATEOEMDRVISO" = "true" ]; then
+  echo -e "Creating $OEMDRVISOFILENAME.iso at $(date)"
+  mkdir -p "$OEMDRVDIR"
+  rm -f "$OEMDRVDIR"/"$KSCFGDESTFILENAME" # Remove old ks.cfg
+  cp "$SRCDIR"/"$KSCFGDESTFILENAME" "$OEMDRVDIR"
+  mkisofs -quiet -V OEMDRV -o "$ISORESULTDIR"/"$OEMDRVISOFILENAME".iso "$OEMDRVDIR"
+fi
+
+# Chown/chmod password files and ssh keys
+chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"
 echo -e "Setting ownership and permissions of password files"
-chown "$SUDO_UID":"$SUDO_GID" "$SRCDIR"/password*.txt
-chmod 600 "$SRCDIR"/password*.txt
+chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"/password*.txt
+chmod 600 "$CREDSDIR"/password*.txt
 echo -e "Setting ownership of ssh key files"
-chown "$SUDO_UID":"$SUDO_GID" "$SRCDIR"/*.id_rsa "$SRCDIR"/*.pub
-
-# Clean up work directory
-echo -e "Cleaning up $WORKDIR at $(date)"
-rm -rf "$WORKDIR"
+chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"/*.id_rsa "$CREDSDIR"/*.pub
+chmod 700 "$CREDSDIR"
 
 # Notify we're done here
-echo -e "$0 total run time was:"
+echo -n "$0 total run time: "
 printf '%dd:%dh:%dm:%ds\n' $((SECONDS/86400)) $((SECONDS%86400/3600)) $((SECONDS%3600/60)) \ $((SECONDS%60))
 echo -e "$0 completed with exit code: $? at $(date)"
