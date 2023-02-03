@@ -10,7 +10,7 @@
 #ISOSRCDIR=""
 
 # Create new full boot ISO
-CREATEBOOTISO="true"
+#CREATEBOOTISO="true"
 
 # Create OEMDRV volume ISO
 CREATEOEMDRVISO="true"
@@ -19,4 +19,4 @@ CREATEOEMDRVISO="true"
 #ENABLEFIPS="true"
 
 # Root password
-password="Password1234"
+#password="Password1234"
