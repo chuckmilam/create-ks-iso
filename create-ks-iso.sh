@@ -5,6 +5,9 @@
 
 # Required packages: isomd5sum, syslinux, genisoimage, python
 
+# Show startup with timestamp on console
+echo -e "$0 starting at $(date)"
+
 ############################
 ## ISO Creation Variables ##
 ############################
@@ -64,15 +67,12 @@ SCRATCHDIR="$SRCDIR/tmp"
 WORKDIRNAME="iso-workdir"
 WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 
-# Create directory for creds if it does not exist
-mkdir -p "$CREDSDIR"
+###################################
+# Credential Generation Variables #
+###################################
 
-#######################
-# Kickstart variables #
-#######################
-
-## FIPS Mode Switch
-: "${ENABLEFIPS:=false}" # Default if not defined
+# Write plaintext passwords to files
+: "${WRITEPASSWDS:=true}" # Default if not defined
 
 ## User Account Variables
 # Create two bootstrap accounts: One Ansible service account and 
@@ -93,6 +93,25 @@ mkdir -p "$CREDSDIR"
 # results in approximately 1.3 characters. 
 # Source: https://docs.python.org/3/library/secrets.html
 : "${passwd_len:=16}" # Default if not defined
+
+# Create directory for creds if it does not exist
+mkdir -p "$CREDSDIR"
+
+#######################
+# Kickstart variables #
+#######################
+
+## FIPS Mode Switch
+: "${ENABLEFIPS:=false}" # Default if not defined
+
+# Show if FIPS mode is enabled on console
+case $ENABLEFIPS in
+  true)
+    echo -e "FIPS mode is ENABLED."
+  ;;
+*)
+    echo -e "FIPS mode is not enabled."
+esac
 
 ########################
 # Function Definitions #
@@ -128,12 +147,19 @@ generate_ssh_keys () {
 # Remove any old password files
 rm -f "$CREDSDIR"/password*.txt
 
-# Write passwords to files for testing/pipeline use 
-# Obviously insecure, don't do this for long-lived prod systems!
-echo "$password" > "$CREDSDIR"/password.txt
-echo "$password_username_01" > "$CREDSDIR"/password_"${username_01}".txt
-echo "$password_username_02" > "$CREDSDIR"/password_"${username_02}".txt
-echo "$grub2_passwd" > "$CREDSDIR"/password_grub2.txt
+case $WRITEPASSWDS in
+  true)
+  # Write passwords to files for testing/pipeline use 
+  # Obviously insecure in the long run, change these if used on a long-lived system.
+  echo "Writing plaintext passwords to $CREDSDIR."
+  echo "$password" > "$CREDSDIR"/password.txt
+  echo "$password_username_01" > "$CREDSDIR"/password_"${username_01}".txt
+  echo "$password_username_02" > "$CREDSDIR"/password_"${username_02}".txt
+  echo "$grub2_passwd" > "$CREDSDIR"/password_grub2.txt
+  ;;
+*)
+    echo "Plaintext passwords NOT written to $CREDSDIR."
+esac
 
 # Encrypt the passwords using python with a FIPS-compliant cypher
 encrypted_password=$( encrypt_random_passwd "$password" ) || { echo "root password encryption ERROR, exiting..."; exit 1; }
@@ -165,18 +191,6 @@ ssh_pub_key_username_02=$(<"$CREDSDIR/${username_02}".id_rsa.pub)
 ################
 # Main Section #
 ################
-
-# Show startup on console
-echo -e "$0 starting at $(date)"
-
-# Show if FIPS mode is enabled
-case $ENABLEFIPS in
-  true)
-    echo -e "FIPS mode is ENABLED."
-  ;;
-*)
-    echo -e "FIPS mode is not enabled."
-esac
 
 # Copy ks.cfg from template file
 cp "$SRCDIR"/ks-template.cfg "$SRCDIR"/ks.cfg
