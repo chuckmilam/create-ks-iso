@@ -7,13 +7,16 @@
 #SRCDIR=""
 
 # Source Media ISO Location
-#ISOSRCDIR=""
+# ISOSRCDIR=""
+
+# OEM Source Media File Name
+#OEMSRCISO="rhel-8.7-x86_64-dvd.iso"
 
 # Create new full boot ISO
 #CREATEBOOTISO="true"
 
 # Create OEMDRV volume ISO
-CREATEOEMDRVISO="true"
+#CREATEOEMDRVISO="true"
 
 # FIPS Mode
 #ENABLEFIPS="true"
