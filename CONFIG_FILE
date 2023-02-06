@@ -21,5 +21,12 @@
 # FIPS Mode
 #ENABLEFIPS="true"
 
-# Root password
+# Write plaintext passwords to files
+# Generally uneeded, but useful for console testing.
+# NOT Recommended to write plaintext passwords out.
+# WRITEPASSWDS="false"
+
+# Root password - Specify a password in plain text.
+# Generally uneeded, but useful for console testing.
+# NOT Recommended to write plaintext passwords out.
 #password=""

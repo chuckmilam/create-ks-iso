@@ -72,7 +72,7 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 ###################################
 
 # Write plaintext passwords to files
-: "${WRITEPASSWDS:=true}" # Default if not defined
+: "${WRITEPASSWDS:=false}" # Default if not defined
 
 ## User Account Variables
 # Create two bootstrap accounts: One Ansible service account and 
