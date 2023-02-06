@@ -298,6 +298,12 @@ if [ "$CREATEBOOTISO" = "true" ]; then
     exit 1
   fi
 
+  # Exit if ISO source file does not exist
+  if [[ ! -f "$ISOSRCDIR/$OEMSRCISO" ]] ; then
+    echo "ISO source file $ISOSRCDIR/$OEMSRCISO not found, please correct. Exiting."
+    exit 1
+  fi
+
   # ISO Volume Name must match or boot will fail
   OEMSRCISOVOLNAME=$(blkid -o value "$ISOSRCDIR"/$OEMSRCISO | sed -n 3p)
 
