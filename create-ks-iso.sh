@@ -293,8 +293,8 @@ if [ "$CREATEBOOTISO" = "true" ]; then
 
   # Exit if ISO source location does not exist
   # Note: Don't create this automatically to avoid potentially clobbering a large ISO store
-  if [[ ! -d "$ISOSRCDIR" ]] || [[ ! -h "$ISOSRCDIR" ]]; then
-    echo "ISO source directory not found, please correct. Exiting."
+  if [[ ! -d "$ISOSRCDIR" ]] && [[ ! -h "$ISOSRCDIR" ]]; then
+    echo "ISO source directory $ISOSRCDIR not found, please correct. Exiting."
     exit 1
   fi
 
