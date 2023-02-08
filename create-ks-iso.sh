@@ -6,7 +6,7 @@
 # Required packages: isomd5sum, syslinux, genisoimage, python
 
 # Show startup with timestamp on console
-echo -e "$0 starting at $(date)"
+echo -e "$0: Starting at $(date)"
 
 ############################
 ## ISO Creation Variables ##
@@ -94,12 +94,42 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 # Source: https://docs.python.org/3/library/secrets.html
 : "${passwd_len:=16}" # Default if not defined
 
+### Check for required files and directories
+
+if [ "$CREATEBOOTISO" = "true" ]; then
+  # Check for required root privileges, needed to mount and extract OEM ISO
+  if [ "$EUID" -ne 0 ]
+    then echo "$0: This script requires root privileges for the \"mount\" command. Please run with sudo or su."
+    exit
+  fi
+fi
+
+if [ "$CREATEBOOTISO" = "true" ] || [ "$CREATEOEMDRVISO" = "true" ]; then
+  # Create ISO Result Location if it does not exist
+  mkdir -p "$ISORESULTDIR"
+fi
+
+# Exit if ISO source location does not exist, required for creation of bootable ISO
+# Note: Don't create this automatically to avoid potentially clobbering a large ISO store
+if [ "$CREATEBOOTISO" = "true" ]; then
+  if [[ ! -d "$ISOSRCDIR" ]] && [[ ! -h "$ISOSRCDIR" ]]; then
+    echo "$0: ISO source directory $ISOSRCDIR not found, please correct. Exiting."
+    exit 1
+  fi
+fi 
+
+# Exit if ISO source file does not exist, required for creation of bootable ISO
+if [ "$CREATEBOOTISO" = "true" ]; then
+  if [[ ! -f "$ISOSRCDIR/$OEMSRCISO" ]] ; then
+    echo "$0: ISO source file $ISOSRCDIR/$OEMSRCISO not found, please correct. Exiting."
+    exit 1
+  fi
+fi
+
+echo "$0: Required files and directory checks passed."
+
 # Create directory for creds if it does not exist
 mkdir -p "$CREDSDIR"
-
-#######################
-# Kickstart variables #
-#######################
 
 ## FIPS Mode Switch
 : "${ENABLEFIPS:=false}" # Default if not defined
@@ -107,10 +137,10 @@ mkdir -p "$CREDSDIR"
 # Show if FIPS mode is enabled on console
 case $ENABLEFIPS in
   true)
-    echo -e "FIPS mode is ENABLED."
+    echo -e "$0: FIPS mode is ENABLED."
   ;;
 *)
-    echo -e "FIPS mode is not enabled."
+    echo -e "$0: FIPS mode is not enabled."
 esac
 
 ########################
@@ -137,12 +167,12 @@ generate_ssh_keys () {
 
 # If passwords not defined, generate passwords of either $passwd_len or a default 16 characters using python
 # Change the number at the end of the python-one liner to set password length
-: "${password:=$( generate_random_passwd )}" || { echo "root password generation ERROR, exiting..."; exit 1; }
-: "${password_username_01:=$( generate_random_passwd )}" || { echo "$username_01 password generation ERROR, exiting..."; exit 1; }
-: "${password_username_02:=$( generate_random_passwd )}" || { echo "$username_02 password generation ERROR, exiting..."; exit 1; }
+: "${password:=$( generate_random_passwd )}" || { echo "$0: root password generation ERROR, exiting..."; exit 1; }
+: "${password_username_01:=$( generate_random_passwd )}" || { echo "$0: $username_01 password generation ERROR, exiting..."; exit 1; }
+: "${password_username_02:=$( generate_random_passwd )}" || { echo "$0: $username_02 password generation ERROR, exiting..."; exit 1; }
 
 # grub2 bootloader password
-: "${grub2_passwd:=$( generate_random_passwd )}" || { echo "grub2 bootloader password generation ERROR, exiting..."; exit 1; }
+: "${grub2_passwd:=$( generate_random_passwd )}" || { echo "$0: grub2 bootloader password generation ERROR, exiting..."; exit 1; }
 
 # Remove any old password files
 rm -f "$CREDSDIR"/password*.txt
@@ -151,24 +181,24 @@ case $WRITEPASSWDS in
   true)
   # Write passwords to files for testing/pipeline use 
   # Obviously insecure in the long run, change these if used on a long-lived system.
-  echo "Writing plaintext passwords to $CREDSDIR."
+  echo "$0: Writing plaintext passwords to $CREDSDIR."
   echo "$password" > "$CREDSDIR"/password.txt
   echo "$password_username_01" > "$CREDSDIR"/password_"${username_01}".txt
   echo "$password_username_02" > "$CREDSDIR"/password_"${username_02}".txt
   echo "$grub2_passwd" > "$CREDSDIR"/password_grub2.txt
   ;;
 *)
-    echo "Plaintext passwords NOT written to $CREDSDIR."
+    echo "$0: Plaintext passwords NOT written to $CREDSDIR."
 esac
 
 # Encrypt the passwords using python with a FIPS-compliant cypher
-encrypted_password=$( encrypt_random_passwd "$password" ) || { echo "root password encryption ERROR, exiting..."; exit 1; }
-encrypted_password_username_01=$( encrypt_random_passwd "$password_username_01"  ) || { echo "$username_01 password encryption ERROR, exiting..."; exit 1; }
-encrypted_password_username_02=$( encrypt_random_passwd "$password_username_02" ) || { echo "$username_02 password encryption ERROR, exiting..."; exit 1; }
+encrypted_password=$( encrypt_random_passwd "$password" ) || { echo "$0: root password encryption ERROR, exiting..."; exit 1; }
+encrypted_password_username_01=$( encrypt_random_passwd "$password_username_01"  ) || { echo "$0: $username_01 password encryption ERROR, exiting..."; exit 1; }
+encrypted_password_username_02=$( encrypt_random_passwd "$password_username_02" ) || { echo "$0: $username_02 password encryption ERROR, exiting..."; exit 1; }
 
 # Generate grub2 bootloader password, unfortunately the grub2-mkpasswd-pbkdf2
 # command is interactive, so we have to emulate the keypresses:
-grub2_encrypted_passwd=$(echo -e "$grub2_passwd\n$grub2_passwd" | grub2-mkpasswd-pbkdf2 | awk '/grub.pbkdf/{print$NF}') || { echo "Grub password generation ERROR, exiting..."; exit 1; }
+grub2_encrypted_passwd=$(echo -e "$grub2_passwd\n$grub2_passwd" | grub2-mkpasswd-pbkdf2 | awk '/grub.pbkdf/{print$NF}') || { echo "$0: Grub password generation ERROR, exiting..."; exit 1; }
 
 # Generate a random disk encryption password
 random_luks_passwd=$( generate_random_passwd )
@@ -198,9 +228,7 @@ cp "$SRCDIR"/ks-template.cfg "$SRCDIR"/ks.cfg
 ### Append required lines to kickstart file (ks.cfg)
 
 ## Bootloader section
-
 cat << EOF >> "$SRCDIR"/ks.cfg
-
 # Specify how the bootloader should be installed (required)
 # This password hash must be generated by: grub2-mkpasswd-pbkdf2
 EOF
@@ -279,31 +307,7 @@ chmod 000 /crypto_keyfile.bin
 %end
 EOF
 
-if [ "$CREATEBOOTISO" = "true" ] || [ "$CREATEOEMDRVISO" = "true" ]; then
-  # Create ISO Result Location if it does not exist
-  mkdir -p "$ISORESULTDIR"
-fi
-
 if [ "$CREATEBOOTISO" = "true" ]; then
-  # Check for required root privileges, needed to mount and extract OEM ISO
-  if [ "$EUID" -ne 0 ]
-    then echo "This script requires root privileges for the \"mount\" command. Please run with sudo or su."
-    exit
-  fi
-
-  # Exit if ISO source location does not exist
-  # Note: Don't create this automatically to avoid potentially clobbering a large ISO store
-  if [[ ! -d "$ISOSRCDIR" ]] && [[ ! -h "$ISOSRCDIR" ]]; then
-    echo "ISO source directory $ISOSRCDIR not found, please correct. Exiting."
-    exit 1
-  fi
-
-  # Exit if ISO source file does not exist
-  if [[ ! -f "$ISOSRCDIR/$OEMSRCISO" ]] ; then
-    echo "ISO source file $ISOSRCDIR/$OEMSRCISO not found, please correct. Exiting."
-    exit 1
-  fi
-
   # ISO Volume Name must match or boot will fail
   OEMSRCISOVOLNAME=$(blkid -o value "$ISOSRCDIR"/$OEMSRCISO | sed -n 3p)
 
@@ -317,7 +321,7 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   mount -o ro "$ISOSRCDIR"/"$OEMSRCISO" "$ISOTMPMNT"
 
   # Extract the ISO image into a working directory
-  echo -e "Extracting $OEMSRCISO image into $WORKDIR at $(date)"
+  echo -e "$0: Extracting $OEMSRCISO image into $WORKDIR at $(date)"
   shopt -s dotglob # Be sure to grab dotfiles also
   cp -aRf "$ISOTMPMNT"/* "$WORKDIR"
 
@@ -356,31 +360,31 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   # Note, the relative pathnames in the arguments to mkisofs are required, as per the man page:
   # "The pathname must be relative to the source path..."
   # This is why we do the rather ugly "cd" into the working dir below.
-  cd "$WORKDIR" || { echo "Unable to change directory, exiting."; exit 1; }
-  echo -e "Building new ISO image at $(date)."
+  cd "$WORKDIR" || { echo "$0: Unable to change directory to $WORKDIR, exiting."; exit 1; }
+  echo -e "$0: Building new ISO image at $(date)."
   mkisofs -quiet -o ../$SCRATCHISONAME -b isolinux/isolinux.bin -J -R -l -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e images/efiboot.img -no-emul-boot -graft-points -joliet-long -V "$OEMSRCISOVOLNAME" .
-  cd "$SRCDIR" || { echo "Unable to change directory, exiting."; exit 1; }
+  cd "$SRCDIR" || { echo "$0: Unable to change directory to $SRCDIR, exiting."; exit 1; }
 
   # Build UEFI bootable image
-  echo -e "Making $SCRATCHISONAME UEFI bootable at $(date)"
+  echo -e "$0: Making $SCRATCHISONAME UEFI bootable at $(date)"
   isohybrid --uefi "$SCRATCHDIR"/$SCRATCHISONAME 2> /dev/null # Suppress warning about more than 1024 cylinders
 
   # Implant a md5 checksum into the new ISO image
-  echo -e "Implanting MD5 checksum into $SCRATCHISONAME at $(date)"
+  echo -e "$0: Implanting MD5 checksum into $SCRATCHISONAME at $(date)"
   implantisomd5 "$SCRATCHDIR"/$SCRATCHISONAME
 
   # Move new iso to ISOs dir
-  echo -e "Moving new $SCRATCHISONAME to result directory and renaming to $NEWISONAME at $(date)"
+  echo -e "$0: Moving new $SCRATCHISONAME to result directory and renaming to $NEWISONAME at $(date)"
   mv "$SCRATCHDIR"/$SCRATCHISONAME "$ISORESULTDIR"/"$NEWISONAME"
 
   # Clean up work directory
-  echo -e "Cleaning up $WORKDIR at $(date)"
+  echo -e "$0: Cleaning up $WORKDIR at $(date)"
   rm -rf "$WORKDIR"
 
   # Chown new ISO and other generated files (will be owned by root otherwise)
-  echo -e "Setting ownership of $ISORESULTDIR"
+  echo -e "$0: Setting ownership of $ISORESULTDIR"
   chown "$SUDO_UID":"$SUDO_GID" "$ISOTMPMNT"
-  echo -e "Setting ownership of $ISORESULTDIR/$NEWISONAME"
+  echo -e "$0: Setting ownership of $ISORESULTDIR/$NEWISONAME"
   chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR"/"$NEWISONAME"
   if [[ -f "$ISORESULTDIR/$OEMDRVISOFILENAME.iso" ]]; then
     chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR/$OEMDRVISOFILENAME.iso"
@@ -389,7 +393,7 @@ if [ "$CREATEBOOTISO" = "true" ]; then
 fi
 
 if [ "$CREATEOEMDRVISO" = "true" ]; then
-  echo -e "Creating $OEMDRVISOFILENAME.iso at $(date)"
+  echo -e "$0: Creating $OEMDRVISOFILENAME.iso at $(date)"
   mkdir -p "$OEMDRVDIR"
   rm -f "$OEMDRVDIR"/"$KSCFGDESTFILENAME" # Remove old ks.cfg
   cp "$SRCDIR"/"$KSCFGDESTFILENAME" "$OEMDRVDIR"
@@ -398,14 +402,18 @@ fi
 
 # Chown/chmod password files and ssh keys
 chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"
-echo -e "Setting ownership and permissions of password files"
-chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"/password*.txt
-chmod 600 "$CREDSDIR"/password*.txt
-echo -e "Setting ownership of ssh key files"
+
+if [ "$WRITEPASSWDS" = "true" ]; then
+  echo -e "$0: Setting ownership and permissions of password files"
+  chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"/password*.txt
+  chmod 600 "$CREDSDIR"/password*.txt
+fi
+
+echo -e "$0: Setting ownership of ssh key files"
 chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"/*.id_rsa "$CREDSDIR"/*.pub
 chmod 700 "$CREDSDIR"
 
 # Notify we're done here
-echo -n "$0 total run time: "
+echo -n "$0: Total run time: "
 printf '%dd:%dh:%dm:%ds\n' $((SECONDS/86400)) $((SECONDS%86400/3600)) $((SECONDS%3600/60)) \ $((SECONDS%60))
-echo -e "$0 completed with exit code: $? at $(date)"
+echo -e "$0: Completed with exit code: $? at $(date)"
