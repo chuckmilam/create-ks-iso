@@ -274,8 +274,8 @@ partition pv.01 --fstype='lvmpv' --grow --size=1 --encrypted --luks-version=luks
 
 %post
 # Allow provisioning account to sudo without password for initial 
-# systems configuration. Should be removed after system is 
-# provisioned and deployed.
+# systems configuration. Should be removed or configured per
+# policy once system is provisioned and deployed.
 cat >> /etc/sudoers.d/provisioning << EOF_sudoers
 ### Allow these accounts sudo access with no password until system fully deployed ###
 # This should be temporary and removed after full provisioning of the system
@@ -289,7 +289,7 @@ chmod 0440 /etc/sudoers.d/provisioning
 dd bs=512 count=4 if=/dev/urandom of=/crypto_keyfile.bin
 
 # Add the keyfile as a valid unlock password for /
-# NOTE: This string must match the passphrase used for the pv partition line above
+# NOTE: This string must match the passphrase used for the pv partition line above.
 echo "$random_luks_passwd" | cryptsetup luksAddKey $LUKSDEV /crypto_keyfile.bin
 
 # Configure dracut to include this keyfile in the initramfs
