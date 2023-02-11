@@ -305,6 +305,8 @@ dracut -f
 # Lock everyone out of the keyfile
 chmod 000 /crypto_keyfile.bin
 %end
+
+### Generated with $0 by $USER on $(date)
 EOF
 
 if [ "$CREATEBOOTISO" = "true" ]; then
