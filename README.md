@@ -1,4 +1,4 @@
-# create-ks-iso
+# create-ks-iso.sh
 A bash script for dynamically creating a STIG-compliant kickstart file with randomly-generated bootstrap user credentials. 
 Includes options for creating custom install ISO images to enable non-interactive FIPS-compliant installations of RHEL-based Linux distributions.
 
