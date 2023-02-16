@@ -1,9 +1,7 @@
 #!/usr/bin/bash
 
-# Reference:  How to create a modified Red Hat Enterprise Linux ISO with kickstart file 
-#             or modified installation media? (https://access.redhat.com/solutions/60959)
-
-# Required packages: isomd5sum, syslinux, genisoimage, python
+### create-ks-iso.sh: A bash script for dynamically creating a STIG-compliant kickstart file with randomly-generated bootstrap user credentials.
+### Project home: https://github.com/chuckmilam/create-ks-iso
 
 # Show startup with timestamp on console
 echo -e "$0: Starting at $(date)"
@@ -253,19 +251,6 @@ cat << EOF > "$SRCDIR"/ks.cfg
 # Note:
 #   Parentheticals such as: "(optional), (required)" refer to 
 #   kickstart configuration requirements
-#
-# Resources:
-#   1.  How to create a modified Red Hat Enterprise Linux ISO with kickstart file or modified installation media
-#       https://access.redhat.com/solutions/60959
-#
-#   2.  Appendix B. Kickstart commands and options reference
-#       https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/performing_an_advanced_rhel_9_installation/kickstart-commands-and-options-reference_installing-rhel-as-an-experienced-user
-#
-#   3.  How to configure a keyfile in kickstart
-#       https://access.redhat.com/solutions/4349431
-#
-#   4.  Configuring manual enrollment of LUKS-encrypted volumes using a TPM 2.0 policy
-#       https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/security_hardening/configuring-automated-unlocking-of-encrypted-volumes-using-policy-based-decryption_security-hardening#configuring-manual-enrollment-of-volumes-using-tpm2_configuring-automated-unlocking-of-encrypted-volumes-using-policy-based-decryption
 
 # Perform installation from the first optical drive on the system. (optional)
 #   Use CDROM installation media, NOTE: This requires the full install DVD ISO. 
@@ -492,7 +477,7 @@ dracut -f
 chmod 000 /crypto_keyfile.bin
 %end
 
-### Generated with $0 by $USER on $(date)
+### Generated with $0 by $USER at $(date)
 EOF
 
 if [ "$CREATEBOOTISO" = "true" ]; then
