@@ -18,7 +18,7 @@ This script has been in my tool box for a long time. It harkens back to when I f
 ## Roadmap
 Things to implement/improve:
 - [ ] Variables in ks.cfg
-    - [ ] disk partition sizes
+    - [ ] Disk partition sizes
     - [ ] NTP configuration
     - [ ] Network settings
 - [ ] Complete CONFIG_FILE with available variables
