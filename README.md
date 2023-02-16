@@ -6,7 +6,7 @@ Includes options for creating custom install ISO images to enable non-interactiv
 create-ks-iso is a simple script to generate a STIG-compliant kickstart file. Optionally, the user can choose create a custom boot ISO image as well as an OEMDRV ISO for delivering the kickstart file to the system installer; useful in environments where PXE boot or similar network delivery methods may not be available. Bootstrap user credentials may be either randomly-generated or specifically declared as required to fit operational needs. The script can be tailored with default settings easily changed by editing the included CONFIG_FILE template or by setting environment variables at runtime, making it possible to use in automation pipelines.
 
 ## History
-This script has been around my tool back for a long time, going back to when I first started using kickstart around 2007-2008 to automate the deployment of over 200 Linux workstations in a training center where the systems had to be wiped and reinstalled frequently. Striving for STIG compliance brought additional challenges. Rapid prototyping and testing helped streamline it further. Now I'm looking to use it for automated pipeline testing.
+This script has been in my tool box for a long time. It harkens back to when I first started using kickstart around 2007-2008 to automate the deployment of over 200 Linux workstations in a training center where the systems had to be wiped and reinstalled frequently. Later, striving for STIG compliance brought additional challenges. The pace of rapid prototyping and testing helped streamline it further. Now I'm looking to use it for automated pipeline testing in places where containers don't quite make sense yet.
 
 ## Features
 * Dynamic STIG-compliant kickstart file generation
@@ -22,9 +22,12 @@ Things to implement/improve:
     - [ ] NTP configuration
     - [ ] Network settings
 - [ ] Complete CONFIG_FILE with available variables
+- [ ] STIG oscap anaconda plugin logic based on OS distribution and version
+- [ ] Checks for required packages
+- [ ] ksvalidator checks
 
 ## Requirements
-* A Linux system (RHEL/CentOS, Ubuntu, and WSL have all been tested successfully) with these packages installed:
+* Linux system (RHEL/CentOS, Ubuntu, and WSL have all been tested successfully) with these packages installed:
     * bash v4+
     * genisoimage
     * git
