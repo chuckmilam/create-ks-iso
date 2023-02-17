@@ -73,6 +73,13 @@ Using environment variables to override the default settings. Note the use of `s
 CREATEBOOTISO="true" ENABLEFIPS="true" sudo -E ./create-ks-iso.sh
 ```
 
+### Sanitize the working directories
+Run the sanitize script to remove any generated user credential, kickstart, and ISO files.
+```Shell
+./sanitize-create-ks-iso.sh
+```
+Be sure to specify the same environment variables if any were used to change default path names in the initial run of `create-ks-iso.sh`.
+
 ## Roadmap
 Things to implement/improve:
 - [ ] Make configurable as variables in ks.cfg:
