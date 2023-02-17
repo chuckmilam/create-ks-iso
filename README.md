@@ -6,15 +6,20 @@ Includes options for creating custom install ISO images to enable non-interactiv
 create-ks-iso is a simple script to generate a STIG-compliant kickstart file. Optionally, the user can choose create a custom boot ISO image as well as an OEMDRV ISO for delivering the kickstart file to the system installer; useful in environments where PXE boot or similar network delivery methods may not be available. Bootstrap user credentials may be either randomly-generated or specifically declared as required to fit operational needs. The script can be tailored with default settings easily changed by editing the included CONFIG_FILE template or by setting environment variables at runtime, making it possible to use in automation pipelines.
 
 ### The Challenges of RHEL STIG Compliance
-There are two aspects of RHEL STIG compliance efforts that realistically must be addressed at install time: Setting Federal Information Processing Standard (FIPS) 140-2 mode and configuring whole-disk encryption. This project attempts to address both.
+There are two aspects of RHEL STIG compliance efforts that realistically must be addressed at install time: 
+1. Setting Federal Information Processing Standard (FIPS) 140-2 mode
+2. Configuring whole-disk encryption
+This project attempts to address both.
 
 #### FIPS Mode
 While FIPS mode can be enabled after the OS install, it is [not the recommended practice](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/security_hardening/assembly_installing-a-rhel-8-system-with-fips-mode-enabled_security-hardening#proc_installing-the-system-with-fips-mode-enabled_assembly_installing-a-rhel-8-system-with-fips-mode-enabled) and can leave the system in an inconsistent state. Anecdotally, inspectors and auditors may ask for proof that the system was installed with FIPS enabled rather than switched on after an install. Therefore, where FIPS mode is required, it is recommended to create the modified boot ISO (set CREATEBOOTISO="true") option here and then use it to install the OS.
 
 #### Whole-Disk Encryption
-The RHEL 8 STIG introduced the *de facto* requirement that [all system partitions are encrypted](https://www.stigviewer.com/stig/red_hat_enterprise_linux_8/2021-06-14/finding/V-230224), unless "...there is a documented and approved reason for not having data-at-rest encryption...." Again, anecdotally, it's easier to comply with the STIG check than argue with an inspector or auditor about just what "documented and approved" means. However, without a method to provide the encryption key/passphrase to unlock system partitions, the system will hang at boot waiting for the passphrase to be typed in at the console. This project provides a method of "baking in" the keyfile to auto-decrypt the system partitions without the need to set up a clevis/tang environment.
+The RHEL 8 STIG introduced the *de facto* requirement that [all system partitions are encrypted](https://www.stigviewer.com/stig/red_hat_enterprise_linux_8/2021-06-14/finding/V-230224), unless *"...there is a documented and approved reason for not having data-at-rest encryption...."* Again, anecdotally, it's easier to comply with the STIG check than argue with an inspector or auditor about just what *"documented and approved"* means. 
 
-## Requirements
+Without a method to provide the encryption key/passphrase to unlock system partitions, the system will hang at boot waiting for the passphrase to be typed in at the console. If each individual partition is encrypted, then a passphrase must be entered for every one. This project provides a method of "baking in" the keyfile to auto-decrypt the system partitions without the need to set up a clevis/tang environment. By encrypting the LVM physical volume instead of the logical volumes, resize operations can occur while leaving disk encryption in place.
+
+## create-ks-iso.sh Requirements
 * A Linux system (RHEL/CentOS, Ubuntu, and WSL have all been tested successfully) with these packages installed:
     * bash v4+
     * genisoimage
@@ -29,7 +34,7 @@ The RHEL 8 STIG introduced the *de facto* requirement that [all system partition
     * Sufficient disk space for ISO creation. Enough is needed for the source OEM install ISO, temporary space for the extracted OEM install ISO, and then the final custom boot ISO. Consider that RHEL 8 and 9 boot ISOs are between 9-12G in size, so plan on at least triple that.
 
 ## Installation
-No installation required, and can be run directly from a user home directory. 
+No installation is required, and this can be run directly from a user home directory.
 To use create-ks-iso, simply clone the GitHub repository:
 ```
 git clone https://github.com/chuckmilam/create-ks-iso
@@ -53,7 +58,14 @@ To generate a kickstart file, simply run the script:
 ```
 ./create-ks-iso.sh
 ```
-This command will generate a kickstart file in the current directory. Note kickstart files generated with default settings will not enable FIPS mode.
+This command will generate a kickstart file in the current directory. Note FIPS mode is not enabled by default, and may not meet STIG compliance requirements.
+
+### Generate an OEMDRV volume ISO
+This ISO volume allows the kickstart file to be detected and run by the system installer with no manual intervention required. In the most common cases, the system install ISO is attached to the machine in the first CD/DVD drive. 
+```Shell
+CREATEOEMDRVISO="true" ./create-ks-iso.sh
+```
+Attach this OEMDRV ISO to the machine to be installed in a second CD/DVD drive and boot from the first CD/DVD drive. It should load and run the kickstart install automatically.
 
 ### Generate a Custom RHEL Boot ISO with FIPS mode enabled
 Using environment variables to override the default settings. Note the use of `sudo -E` to ensure the environment variables are passed into the sudo session.
