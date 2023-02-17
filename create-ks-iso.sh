@@ -1,7 +1,10 @@
 #!/usr/bin/bash
 
 ### create-ks-iso.sh: A bash script for dynamically creating a STIG-compliant kickstart file with randomly-generated bootstrap user credentials.
-### Author @chuckmilam 
+#
+### Author: @chuckmilam 
+###         https://github.com/chuckmilam
+#
 ### Project home: https://github.com/chuckmilam/create-ks-iso
 
 # Show startup with timestamp on console
