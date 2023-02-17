@@ -1,9 +1,9 @@
-# create-ks-iso.sh
+# create-ks-iso
 A bash script for dynamically creating a STIG-compliant kickstart file with randomly-generated bootstrap user credentials. 
 Includes options for creating custom install ISO images to enable non-interactive FIPS-compliant installations of RHEL-based Linux distributions.
 
 ## Overview
-create-ks-iso is a simple script to generate a STIG-compliant kickstart file. Optionally, the user can choose create a custom boot ISO image as well as an OEMDRV ISO for delivering the kickstart file to the system installer; useful in environments where PXE boot or similar network delivery methods may not be available. Bootstrap user credentials may be either randomly-generated or specifically declared as required to fit operational needs. The script can be tailored with default settings easily changed by editing the included CONFIG_FILE template or by setting environment variables at runtime, making it possible to use in automation pipelines.
+create-ks-iso is a simple script to generate a STIG-compliant kickstart file. Optionally, the user can choose create a custom boot ISO image as well as an OEMDRV ISO for delivering the kickstart file to the system installer; useful in environments where PXE boot or similar network delivery methods may not be available. Bootstrap user credentials may be either randomly-generated or specifically declared as required to fit operational needs. The script can be tailored with default settings easily changed by editing the included [CONFIG_FILE](CONFIG_FILE) template or by setting environment variables at runtime, making it possible to use in automation pipelines.
 
 ### The Challenges of RHEL STIG Compliance
 There are two aspects of RHEL STIG compliance efforts that realistically must be addressed at install time: 
