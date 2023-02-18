@@ -20,7 +20,7 @@ The RHEL 8 STIG introduced the *de facto* requirement that [all system partition
 
 Without a method to provide the encryption key/passphrase to unlock system partitions, the system will hang at boot waiting for the passphrase to be typed in at the console. If each individual partition is encrypted, then a passphrase must be entered for every one. This project provides a method of "baking in" the keyfile to auto-decrypt the system partitions without the need to set up a clevis/tang environment. By encrypting the LVM physical volume instead of the logical volumes, resize operations can occur while leaving disk encryption in place.
 
-## create-ks-iso.sh Requirements
+## Requirements
 * A Linux system (RHEL/CentOS, Ubuntu, and WSL have all been tested successfully) with these packages installed:
     * bash v4+
     * genisoimage
