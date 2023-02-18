@@ -9,6 +9,7 @@ create-ks-iso is a simple script to generate a STIG-compliant kickstart file. Op
 There are two aspects of RHEL STIG compliance efforts that realistically must be addressed at install time: 
 1. Setting Federal Information Processing Standard (FIPS) 140-2 mode
 2. Configuring whole-disk encryption
+
 This project attempts to address both.
 
 #### FIPS Mode
