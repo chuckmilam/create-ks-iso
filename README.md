@@ -89,10 +89,12 @@ Things to implement/improve:
     - [ ] Disk partition sizes
     - [ ] NTP configuration
     - [ ] Network settings
-- [ ] Complete CONFIG_FILE with available variables
+- [ ] DOCKERFILE for portability
+- [ ] Complete CONFIG_FILE template with available variables
 - [ ] STIG oscap/anaconda plugin logic based on OS distribution and version
-- [ ] Checks for required packages
+- [x] Checks for required packages
 - [ ] ksvalidator checks
+- [ ] Change ntpserver kickstart statement per major OS version (8.x vs 9.x)
 
 ## History
 This script has been in my tool box for a long time. It harkens back to when I first started using kickstart around 2007-2008 to automate the deployment of over 200 Linux workstations in a training center where the systems had to be wiped and reinstalled frequently. Later, striving for STIG compliance brought additional challenges. The pace of rapid prototyping and testing helped streamline it further. Now I'm looking to use it for automated pipeline testing in places where containers don't quite make sense yet.
@@ -104,4 +106,5 @@ This project utilized the following resources:
 * [How to configure a keyfile in kickstart](https://access.redhat.com/solutions/4349431)
 * [Configuring manual enrollment of LUKS-encrypted volumes using a TPM 2.0 policy](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/security_hardening/configuring-automated-unlocking-of-encrypted-volumes-using-policy-based-decryption_security-hardening#configuring-manual-enrollment-of-volumes-using-tpm2_configuring-automated-unlocking-of-encrypted-volumes-using-policy-based-decryption)
 * [Making a Kickstart file available on a local volume for automatic loading](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/performing_an_advanced_rhel_9_installation/making-kickstart-files-available-to-the-installation-program_installing-rhel-as-an-experienced-user#making-a-kickstart-file-available-on-a-local-volume-for-automatic-loading_making-kickstart-files-available-to-the-installation-program)
+* [DVD embedded Kickstart for RHEL 7 utilizing SCAP Security Guide (SSG) as a hardening script.](https://github.com/RedHatGov/ssg-el7-kickstart/blob/master/createiso.sh)
 * [The ShellCheck plugin for Visual Studio Code](https://github.com/vscode-shellcheck/vscode-shellcheck)

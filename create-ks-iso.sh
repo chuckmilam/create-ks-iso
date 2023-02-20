@@ -88,62 +88,11 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 : "${username_02:=alt.admin}" # Default if not defined
 : "${username_02_gecos:=Emergency Admin Account}" # Default if not defined 
 
-# Define or Generate Passwords and ssh keys
-
 # Password length in bytes 
 # Note: The python secrets module output is Base64 encoded, so on average each byte 
 # results in approximately 1.3 characters. 
 # Source: https://docs.python.org/3/library/secrets.html
 : "${passwd_len:=16}" # Default if not defined
-
-### Check for required files and directories
-
-if [ "$CREATEBOOTISO" = "true" ]; then
-  # Check for required root privileges, needed to mount and extract OEM ISO
-  if [ "$EUID" -ne 0 ]
-    then echo "$0: This script requires root privileges for the \"mount\" command. Please run with sudo or su."
-    exit
-  fi
-fi
-
-if [ "$CREATEBOOTISO" = "true" ] || [ "$CREATEOEMDRVISO" = "true" ]; then
-  # Create ISO Result Location if it does not exist
-  mkdir -p "$ISORESULTDIR"
-fi
-
-# Exit if ISO source location does not exist, required for creation of bootable ISO
-# Note: Don't create this automatically to avoid potentially clobbering a large ISO store
-if [ "$CREATEBOOTISO" = "true" ]; then
-  if [[ ! -d "$ISOSRCDIR" ]] && [[ ! -h "$ISOSRCDIR" ]]; then
-    echo "$0: ISO source directory $ISOSRCDIR not found, please correct. Exiting."
-    exit 1
-  fi
-fi 
-
-# Exit if ISO source file does not exist, required for creation of bootable ISO
-if [ "$CREATEBOOTISO" = "true" ]; then
-  if [[ ! -f "$ISOSRCDIR/$OEMSRCISO" ]] ; then
-    echo "$0: ISO source file $ISOSRCDIR/$OEMSRCISO not found, please correct. Exiting."
-    exit 1
-  fi
-fi
-
-echo "$0: Required files and directory checks passed."
-
-# Create directory for creds if it does not exist
-mkdir -p "$CREDSDIR"
-
-## FIPS Mode Switch
-: "${ENABLEFIPS:=false}" # Default if not defined
-
-# Show if FIPS mode is enabled on console
-case $ENABLEFIPS in
-  true)
-    echo -e "$0: FIPS mode is ENABLED."
-  ;;
-*)
-    echo -e "$0: FIPS mode is not enabled."
-esac
 
 ########################
 # Function Definitions #
@@ -166,6 +115,92 @@ generate_ssh_keys () {
     ssh-keygen -N "" -f "$CREDSDIR"/"${1}".id_rsa -q -C "${1} kickstart-generated bootstrapping key" # Non-FIPS system defaults
   esac
 }
+
+check_dependency () {
+  if ! command -v $1 &> /dev/null
+  then
+      echo "$1 is a required dependency and was not found. Exiting."
+      exit 1
+  fi
+}
+
+### Check for required files and directories
+
+if [ "$CREATEBOOTISO" = "true" ]; then
+  # Check for required root privileges, needed to mount and extract OEM ISO
+  if [ "$EUID" -ne 0 ]
+    then echo "$0: This script requires root privileges for the \"mount\" command. Please run with sudo (preferred) or su."
+    exit
+  fi
+fi
+
+if [ "$CREATEBOOTISO" = "true" ] || [ "$CREATEOEMDRVISO" = "true" ]; then
+  # Create ISO Result Location if it does not exist (check for either directory or symlink existence)
+    if [[ ! -d "$ISORESULTDIR" ]] && [[ ! -h "$ISORESULTDIR" ]]; then
+    echo "$0: ISO result directory $ISOSRCDIR not found. Creating."
+    mkdir -p "$ISORESULTDIR"
+    echo -e "$0: Setting ownership of $ISORESULTDIR."
+    chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR"
+  fi
+fi
+
+# Exit if ISO source location does not exist, required for creation of bootable ISO
+# Note: Don't create this automatically to avoid potentially clobbering a large ISO store
+if [ "$CREATEBOOTISO" = "true" ]; then
+  if [[ ! -d "$ISOSRCDIR" ]] && [[ ! -h "$ISOSRCDIR" ]]; then
+    echo "$0: ISO source directory $ISOSRCDIR not found, please correct. Exiting."
+    exit 1
+  fi
+fi 
+
+# Exit if ISO source file does not exist, required for creation of bootable ISO
+if [ "$CREATEBOOTISO" = "true" ]; then
+  if [[ ! -f "$ISOSRCDIR/$OEMSRCISO" ]] ; then
+    echo "$0: ISO source file $ISOSRCDIR/$OEMSRCISO not found, please correct. Exiting."
+    exit 1
+  fi
+fi
+
+echo "$0: Required files and directory checks passed."
+
+### Check for required packages
+
+# If passwords are not defined, they'll be generated with python3
+if [[ -z "$password" || -z "$password_username_01" || -z "$password_username_02" ]] ; then
+  check_dependency python3
+fi
+
+if [[ -z "$ssh_pub_key_username_01" || -z "$ssh_pub_key_username_02" ]] ; then
+  check_dependency ssh-keygen
+fi
+
+# If ISOs are to be created mkisofs is a dependency
+if [ "$CREATEBOOTISO" = "true" ] || [ "$CREATEOEMDRVISO" = "true" ]; then
+  check_dependency mkisofs
+fi
+
+# If the bootable ISO is to be created, check for required tools
+if [ "$CREATEBOOTISO" = "true" ] ; then
+  check_dependency isohybrid
+  check_dependency implantisomd5
+fi
+
+# Create directory for creds if it does not exist
+mkdir -p "$CREDSDIR"
+
+## FIPS Mode Switch
+: "${ENABLEFIPS:=false}" # Default if not defined
+
+# Show if FIPS mode is enabled on console
+case $ENABLEFIPS in
+  true)
+    echo -e "$0: FIPS mode is ENABLED."
+  ;;
+*)
+    echo -e "$0: FIPS mode is not enabled."
+esac
+
+### Password Generation
 
 # If passwords not defined, generate passwords of either $passwd_len or a default 16 characters using python
 # Change the number at the end of the python-one liner to set password length
@@ -193,7 +228,7 @@ case $WRITEPASSWDS in
     echo "$0: Plaintext passwords NOT written to $CREDSDIR."
 esac
 
-# Encrypt the passwords using python with a FIPS-compliant cypher
+# Whether generated or defined, encrypt the passwords using python with a FIPS-compliant cypher
 encrypted_password=$( encrypt_random_passwd "$password" ) || { echo "$0: root password encryption ERROR, exiting..."; exit 1; }
 encrypted_password_username_01=$( encrypt_random_passwd "$password_username_01"  ) || { echo "$0: $username_01 password encryption ERROR, exiting..."; exit 1; }
 encrypted_password_username_02=$( encrypt_random_passwd "$password_username_02" ) || { echo "$0: $username_02 password encryption ERROR, exiting..."; exit 1; }
@@ -202,23 +237,34 @@ encrypted_password_username_02=$( encrypt_random_passwd "$password_username_02" 
 # command is interactive, so we have to emulate the keypresses:
 grub2_encrypted_passwd=$(echo -e "$grub2_passwd\n$grub2_passwd" | grub2-mkpasswd-pbkdf2 | awk '/grub.pbkdf/{print$NF}') || { echo "$0: Grub password generation ERROR, exiting..."; exit 1; }
 
+### SSH Key Generation
+## Generated key pairs will be written to $CREDSDIR
+
+if [[ -z "$ssh_pub_key_username_01" || -z "$ssh_pub_key_username_02" ]] ; then
+  # Remove old randomly-generated ssh keys
+  rm -f "$CREDSDIR"/*.id_rsa "$CREDSDIR"/*.pub
+fi
+
+if [[ -z "$ssh_pub_key_username_01" ]] ; then
+  # Create ssh key pair for user 1 (Ansible Service Account)
+  generate_ssh_keys "$username_01"
+  ssh_pub_key_username_01=$(<"$CREDSDIR/${username_01}".id_rsa.pub)
+  echo -e "$0: SSH keys for $username_01 created at $(date)"
+fi
+
+if [[ -z "$ssh_pub_key_username_02" ]] ; then
+  # Create ssh key pairt for user 2 (Emergency Admin Account)
+  generate_ssh_keys "$username_02"
+  ssh_pub_key_username_02=$(<"$CREDSDIR/${username_02}".id_rsa.pub)
+  echo -e "$0: SSH keys for $username_02 created at $(date)"
+fi
+
 # Generate a random disk encryption password
 random_luks_passwd=$( generate_random_passwd )
 
 # Allow luks auto-decryption for root pv.01
 # This comes into play in the post section, also assumes /dev/sda3 is where the root pv will be
 LUKSDEV="/dev/sda3"
-
-# Remove old randomly-generated ssh keys
-rm -f "$CREDSDIR"/*.id_rsa "$CREDSDIR"/*.pub
-
-# Create ssh key pair for user 1 (Ansible Service Account)
-generate_ssh_keys "$username_01"
-ssh_pub_key_username_01=$(<"$CREDSDIR/${username_01}".id_rsa.pub)
-
-# Create ssh key pairt for user 2 (Emergency Admin Account)
-generate_ssh_keys "$username_02"
-ssh_pub_key_username_02=$(<"$CREDSDIR/${username_02}".id_rsa.pub)
 
 ################
 # Main Section #
@@ -230,7 +276,6 @@ cat << EOF > "$SRCDIR"/ks.cfg
 #################################################
 #  Basic Kickstart for STIG-Compliant Installs  #
 #################################################
-#
 #
 # This kickstart configuration defines the bare-minimum framework
 # for STIG-compliant Red Hat-based distribution installs.  
@@ -279,7 +324,7 @@ network --onboot yes --bootproto dhcp --noipv6
 
 # Initial Setup application starts the first time the system is booted. (optional)
 #   If enabled, the initial-setup package must be installed in packages section.
-#   This is what allows for network setup prompts.
+#   This allows for network setup prompts at console, which requires interative user input.
 # firstboot --enabled
 
 # Agree to EULA (required)
@@ -328,7 +373,7 @@ ignoredisk --only-use=sda
 reqpart --add-boot
 
 # Create LVM Volume Group for base system. 
-# Recommend a MINIMUM 30G of space for STIG and HBSS requirements.
+# Recommend a MINIMUM 30G of space for STIG and third-party tool requirements.
 volgroup vg00 --pesize=4096 pv.01
 
 # Create Logical Volumes
@@ -379,7 +424,7 @@ logvol swap  --recommended --fstype='swap' --name=swap --vgname=vg00
 # Define a minimal system environment
 @^minimal-environment
 # Initial Setup application starts the first time the system is booted, required
-# because firstboot option is set above. 
+# when firstboot option is set above. 
 initial-setup
 # STIG-required packages:
 # With STIG oscap profile applied, login will fail unless tmux is installed
@@ -559,7 +604,7 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   rm -rf "$WORKDIR"
 
   # Chown new ISO and other generated files (will be owned by root otherwise)
-  echo -e "$0: Setting ownership of $ISORESULTDIR"
+  echo -e "$0: Setting ownership of $ISOTMPMNT"
   chown "$SUDO_UID":"$SUDO_GID" "$ISOTMPMNT"
   echo -e "$0: Setting ownership of $ISORESULTDIR/$NEWISONAME"
   chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR"/"$NEWISONAME"
