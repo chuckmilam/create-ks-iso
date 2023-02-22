@@ -98,7 +98,26 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 # Kickstart Variables #
 #######################
 
-
+## Logical volume sizes
+# / filesystem logical volume size
+: "${LOGVOLSIZEROOT:=4096}" # Default if not defined
+# /tmp filesystem logical volume size
+: "${LOGVOLSIZETMP:=2048}" # Default if not defined
+# /home filesystem logical volume size
+: "${LOGVOLSIZEHOME:=2048}" # Default if not defined
+# /var filesystem logical volume size
+: "${LOGVOLSIZEVAR:=8092}" # Default if not defined
+# /var/log filesystem logical volume size
+: "${LOGVOLSIZEVARLOG:=2048}" # Default if not defined
+# /var/tmp filesystem logical volume size
+: "${LOGVOLSIZEVARTMP:=2048}" # Default if not defined
+# /var/log/audit filesystem logical volume size
+# RHEL 8 STIG recommends 10.0G of storage space for /var/log/audit, making it a *de facto* requirement
+: "${LOGVOLSIZEVARLOGAUDIT:=10240}" # Default if not defined
+# Third-party tools and agents require free space in /opt
+: "${LOGVOLSIZEOPT:=8192}" # Default if not defined
+# Swap defaults to OS recommended values
+: "${LOGVOLSIZESWAP:=recommended}" # Default if not defined
 
 ########################
 # Function Definitions #
@@ -384,33 +403,24 @@ volgroup vg00 --pesize=4096 pv.01
 
 # Create Logical Volumes
 # Separate Disk Partitions Required by STIG
-logvol /  --fstype='xfs' --size=4096 --name=root --vgname=vg00 
-# Vul ID: V-230295	   	Rule ID: SV-230295r599732_rule	   	STIG ID: RHEL-08-010543	
+logvol /  --fstype='xfs' --size=$LOGVOLSIZEROOT --name=root --vgname=vg00 
 # Ensure /tmp Located On Separate Partition
-logvol /tmp  --fstype='xfs' --size=2048 --name=tmp --vgname=vg00 --fsoptions='nodev,noexec,nosuid'
-# Vul ID: V-230328	   	Rule ID: SV-230328r599732_rule	   	STIG ID: RHEL-08-010800	 
+logvol /tmp  --fstype='xfs' --size=$LOGVOLSIZETMP --name=tmp --vgname=vg00 --fsoptions='nodev,noexec,nosuid'
 # Ensure /home Located On Separate Partition
-logvol /home  --fstype='xfs' --size=2048 --name=home --vgname=vg00 --fsoptions='nodev,noexec'
-# Vul ID: V-230292	   	Rule ID: SV-230292r599732_rule	   	STIG ID: RHEL-08-010540	 
+logvol /home  --fstype='xfs' --size=$LOGVOLSIZEHOME --name=home --vgname=vg00 --fsoptions='nodev,noexec'
 # Ensure /var Located On Separate Partition
-logvol /var  --fstype='xfs' --size=8092 --name=var --vgname=vg00 --fsoptions='nodev'
-# Vul ID: V-230293	   	Rule ID: SV-230293r599732_rule	   	STIG ID: RHEL-08-010541	
+logvol /var  --fstype='xfs' --size=$LOGVOLSIZEVAR --name=var --vgname=vg00 --fsoptions='nodev'
 # Ensure /var/log Located On Separate Partition
-logvol /var/log  --fstype='xfs' --size=2048 --name=varlog --vgname=vg00 --fsoptions='nodev'
-# No specific check requiring separate /var/tmp, but three CAT IIs require mount options.
-# Therefore, this separate partition is implied
-logvol /var/tmp  --fstype='xfs' --size=2048 --name=vartmp --vgname=vg00 --fsoptions='nodev,noexec,nosuid'
-# Vul ID: V-230294	   	Rule ID: SV-230294r599732_rule	   	STIG ID: RHEL-08-010542	  
+logvol /var/log  --fstype='xfs' --size=$LOGVOLSIZEVARLOG --name=varlog --vgname=vg00 --fsoptions='nodev'
+# Ensure /var/tmp Located On Separate Partition
+logvol /var/tmp  --fstype='xfs' --size=$LOGVOLSIZEVARTMP --name=vartmp --vgname=vg00 --fsoptions='nodev,noexec,nosuid'
 # Ensure /var/log/audit Located On Separate Partition
-# Vul ID: V-230476	   	Rule ID: SV-230476r599732_rule	   	STIG ID: RHEL-08-030660	
-# STIG recommends 10.0G of storage space here, making it a de facto requirement
-logvol /var/log/audit  --fstype='xfs' --size=10240 --name=varlogaudit --vgname=vg00 --fsoptions='nodev'
-# This is NOT required by STIG, but is a defacto operational requirement
+logvol /var/log/audit  --fstype='xfs' --size=$LOGVOLSIZEVARLOGAUDIT--name=varlogaudit --vgname=vg00 --fsoptions='nodev'
 # Third-party tools and agents require free space in /opt
-logvol /opt  --fstype='xfs' --size=8192 --name=opt --vgname=vg00 --fsoptions='nodev'
+logvol /opt  --fstype='xfs' --size=$LOGVOLSIZEOPT --name=opt --vgname=vg00 --fsoptions='nodev'
 
 # Remember to remove/disable swap if hosting K8S, Elasticsearch, etc.
-logvol swap  --recommended --fstype='swap' --name=swap --vgname=vg00 
+logvol swap  --$LOGVOLSIZESWAP --fstype='swap' --name=swap --vgname=vg00 
 ## End boot partition information
 
 # STIG ID RHEL-08-10670: Disable kdump
