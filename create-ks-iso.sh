@@ -94,6 +94,12 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 # Source: https://docs.python.org/3/library/secrets.html
 : "${passwd_len:=16}" # Default if not defined
 
+#######################
+# Kickstart Variables #
+#######################
+
+
+
 ########################
 # Function Definitions #
 ########################
@@ -197,7 +203,7 @@ case $ENABLEFIPS in
     echo -e "$0: FIPS mode is ENABLED."
   ;;
 *)
-    echo -e "$0: FIPS mode is not enabled."
+    echo -e "$0: FIPS mode NOT enabled."
 esac
 
 ### Password Generation
