@@ -511,11 +511,9 @@ partition pv.01 --fstype='lvmpv' --grow --size=1 --encrypted --luks-version=luks
 
 %post
 # Allow provisioning account to sudo without password for initial 
-# systems configuration. Should be removed or configured per
-# policy once system is provisioned and deployed.
+# systems configuration. Configure per policy once system is provisioned and deployed.
 cat >> /etc/sudoers.d/provisioning << EOF_sudoers
 ### Allow these accounts sudo access with no password until system fully deployed ###
-# This should be temporary and removed after full provisioning of the system
 $username_01 ALL=(ALL) NOPASSWD: ALL
 $username_02 ALL=(ALL) NOPASSWD: ALL
 EOF_sudoers
