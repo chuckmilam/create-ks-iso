@@ -304,14 +304,15 @@ cat << EOF > "$SRCDIR"/ks.cfg
 #################################################
 #
 # This kickstart configuration defines the bare-minimum framework
-# for STIG-compliant Red Hat-based distribution installs.  
+# for STIG-compliant Red Hat-based OS distribution installations.  
 # Project home: https://github.com/chuckmilam/stig-boot-iso
 #
 # Main features: 
-#   1. FIPS mode
+#   1. FIPS mode option
 #   2. Disk encryption as required by RHEL STIG
-#   3. STIG-required disk partitions 
-#   4. Separate /opt partition for required third-party compliance tools and agents 
+#   3. STIG-required disk partitions
+#   4. Separate /opt partition for required third-party compliance tools and agents
+#   5. Dynamically-created bootstrap users credentials
 #
 # Design Philosopy: 
 #   Only minimal system configurations should be made here, those required at 
@@ -319,7 +320,7 @@ cat << EOF > "$SRCDIR"/ks.cfg
 #   system configuration tool such as Ansible.
 #  
 # Assumptions: 
-#   1. PXE boot is NOT an option.
+#   1. PXE boot is NOT an option, requiring use of the ISOs.
 #   2. Support infrastucture such as clevis/tang systems are not available.
 #   3. System will be a physical or VM system.
 #
