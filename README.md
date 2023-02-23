@@ -1,16 +1,16 @@
 # create-ks-iso
-A bash script for dynamically creating a STIG-compliant kickstart file with randomly-generated bootstrap user credentials. 
+Dynamically creates a STIG-compliant kickstart file with randomly-generated bootstrap user credentials for compliance testing in an automation pipeline.  
 Includes options for creating custom install ISO images to enable non-interactive FIPS-compliant installations of RHEL-based Linux distributions.
 
 ## Overview
-create-ks-iso is a simple script to generate a STIG-compliant kickstart file. Optionally, the user can choose create a custom boot ISO image as well as an OEMDRV ISO for delivering the kickstart file to the system installer; useful in environments where PXE boot or similar network delivery methods may not be available. Bootstrap user credentials may be either randomly-generated or specifically declared as required to fit operational needs. The script can be tailored with default settings easily changed by editing the included [CONFIG_FILE](CONFIG_FILE) template or by setting environment variables at runtime, making it possible to use in automation pipelines.
+create-ks-iso is intended to be a simple, lightweight solution to generate a STIG-compliant kickstart file. Optionally, the user can choose create a custom boot ISO image as well as an OEMDRV ISO for delivering the kickstart file to the system installer; useful in environments where PXE boot or similar network delivery methods may not be available. Bootstrap user credentials may be either randomly-generated or specifically declared as required to fit operational needs. The kickstart file can be tailored at the point of generation. Default settings are easily changed either by editing the included [CONFIG_FILE](CONFIG_FILE) template or by setting environment variables at runtime, making it possible to use in automation pipelines.
 
 ### The Challenges of RHEL STIG Compliance
 There are two aspects of RHEL STIG compliance efforts that realistically must be addressed at install time: 
 1. Setting Federal Information Processing Standard (FIPS) 140-2 mode
 2. Configuring whole-disk encryption
 
-This project attempts to address both.
+This project attempts to address both challenges.
 
 #### FIPS Mode
 While FIPS mode can be enabled after the OS install, it is [not the recommended practice](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/security_hardening/assembly_installing-a-rhel-8-system-with-fips-mode-enabled_security-hardening#proc_installing-the-system-with-fips-mode-enabled_assembly_installing-a-rhel-8-system-with-fips-mode-enabled) and can leave the system in an inconsistent state. Anecdotally, inspectors and auditors may ask for proof that the system was installed with FIPS enabled rather than switched on after an install. Therefore, where FIPS mode is required, it is recommended to create the modified boot ISO (set CREATEBOOTISO="true") option here and then use it to install the OS.
@@ -81,12 +81,12 @@ Run the sanitize script to remove any generated user credential, kickstart, and 
 ```Shell
 ./sanitize-create-ks-iso.sh
 ```
-Be sure to specify the same environment variables if any were used to change default path names in the initial run of `create-ks-iso.sh`.
+Be sure to specify the same configuration/environment variables if any were used to change default path names in the initial run of `create-ks-iso.sh`.
 
 ## Roadmap
 Things to implement/improve:
 - [ ] Make configurable as variables in ks.cfg:
-    - [ ] Disk partition sizes
+    - [x] Disk partition sizes
     - [ ] NTP configuration
     - [ ] Network settings
 - [ ] DOCKERFILE for portability
