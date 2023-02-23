@@ -206,6 +206,7 @@ fi
 
 # If the bootable ISO is to be created, check for required tools
 if [ "$CREATEBOOTISO" = "true" ] ; then
+  check_dependency blkid
   check_dependency isohybrid
   check_dependency implantisomd5
 fi
