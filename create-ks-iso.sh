@@ -112,12 +112,16 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 # /var/tmp filesystem logical volume size
 : "${LOGVOLSIZEVARTMP:=2048}" # Default if not defined
 # /var/log/audit filesystem logical volume size
-# RHEL 8 STIG recommends 10.0G of storage space for /var/log/audit, making it a *de facto* requirement
+# RHEL 8 STIG requires 10.0G of storage space for /var/log/audit
 : "${LOGVOLSIZEVARLOGAUDIT:=10240}" # Default if not defined
 # Third-party tools and agents require free space in /opt
 : "${LOGVOLSIZEOPT:=8192}" # Default if not defined
 # Swap defaults to OS recommended values
 : "${LOGVOLSIZESWAP:=recommended}" # Default if not defined
+
+## System Time Settings
+# Timezone (required)
+: "${TIMEZONE:=America/Chicago}" # Default if not defined
 
 ########################
 # Function Definitions #
@@ -373,7 +377,7 @@ selinux --enforcing
 
 # Set the system time zone (required)
 # Below assumes system clock is in UTC/Zulu time
-timezone America/Chicago --utc --ntpservers=0.us.pool.ntp.org,1.us.pool.ntp.org,2.us.pool.ntp.org,3.us.pool.ntp.org
+timezone $TIMEZONE --utc --ntpservers=0.us.pool.ntp.org,1.us.pool.ntp.org,2.us.pool.ntp.org,3.us.pool.ntp.org
 
 # Partition clearing information (optional)
 # Initialize invalid partition tables, destroy disk contents with invalid partition tables.
