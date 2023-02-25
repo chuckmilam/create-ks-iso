@@ -121,7 +121,10 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 
 ## System Time Settings
 # Timezone (required)
+# Timezone names are sourced from the python pytz.all_timezones list
 : "${TIMEZONE:=America/Chicago}" # Default if not defined
+# System assumes the hardware clock is set to UTC (Greenwich Mean) time
+: "${HWCLOCKUTC:=true}"
 
 ########################
 # Function Definitions #
