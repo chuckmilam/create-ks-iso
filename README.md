@@ -89,6 +89,7 @@ Things to implement/improve:
     - [ ] NTP configuration
     - [ ] Network settings
 - [ ] DOCKERFILE for portability
+    - [ ] Investigate use of Docker .env file instead of CONFIG_FILE
 - [ ] Complete CONFIG_FILE template with available variables
 - [ ] STIG oscap/anaconda plugin logic based on OS distribution and version
 - [x] Checks for required packages
