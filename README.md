@@ -95,6 +95,7 @@ Things to implement/improve:
 - [x] Checks for required packages
 - [ ] ksvalidator checks
 - [ ] Change ntpserver kickstart statement per major OS version (8.x vs 9.x)
+- [ ] Utilize "light" installer ISO for network-based installs
 
 ## History
 This script has been in my tool box for a long time. It harkens back to when I first started using kickstart around 2007-2008 to automate the deployment of over 200 Linux workstations in a training center where the systems had to be wiped and reinstalled frequently. Later, striving for STIG compliance brought additional challenges. The pace of rapid prototyping and testing helped streamline it further. Now I'm looking to use it for automated pipeline testing in places where containers don't quite make sense yet.
