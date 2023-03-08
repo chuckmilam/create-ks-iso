@@ -121,10 +121,14 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 
 ## System Time Settings
 # Timezone (required)
-# Timezone names are sourced from the python pytz.all_timezones list
+# NOTE: Timezone names are sourced from the python pytz.all_timezones list
 : "${TIMEZONE:=America/Chicago}" # Default if not defined
 # System assumes the hardware clock is set to UTC (Greenwich Mean) time
 : "${HWCLOCKUTC:=true}"
+# NTP servers as they should show in the ks.cfg file
+: "${NTP_SERVERS:=0.us.pool.ntp.org,1.us.pool.ntp.org,2.us.pool.ntp.org,3.us.pool.ntp.org}"
+# This is either --utc for system hwclock set to utc, or empty for not.
+: "${UTCSWITCH:=--utc}"
 
 ########################
 # Function Definitions #
@@ -161,7 +165,7 @@ check_dependency () {
 if [ "$CREATEBOOTISO" = "true" ]; then
   # Check for required root privileges, needed to mount and extract OEM ISO
   if [ "$EUID" -ne 0 ]
-    then echo "$0: This script requires root privileges for the \"mount\" command. Please run with sudo (preferred) or su."
+    then echo "$0: In order to create the boot ISO, this script need root privileges for the \"mount\" command. Please run with sudo or su."
     exit
   fi
 fi
@@ -379,8 +383,7 @@ lang en_US.UTF-8
 selinux --enforcing
 
 # Set the system time zone (required)
-# Below assumes system clock is in UTC/Zulu time
-timezone $TIMEZONE --utc --ntpservers=0.us.pool.ntp.org,1.us.pool.ntp.org,2.us.pool.ntp.org,3.us.pool.ntp.org
+timezone $TIMEZONE $UTCSWITCH --ntpservers=$NTP_SERVERS
 
 # Partition clearing information (optional)
 # Initialize invalid partition tables, destroy disk contents with invalid partition tables.
@@ -519,7 +522,7 @@ partition pv.01 --fstype='lvmpv' --grow --size=1 --encrypted --luks-version=luks
 
 %post
 # Allow provisioning account to sudo without password for initial 
-# systems configuration. Configure per policy once system is provisioned and deployed.
+# systems configuration. Configure per policy once system is provisioned/deployed.
 cat >> /etc/sudoers.d/provisioning << EOF_sudoers
 ### Allow these accounts sudo access with no password until system fully deployed ###
 $username_01 ALL=(ALL) NOPASSWD: ALL
