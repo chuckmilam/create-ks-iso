@@ -330,7 +330,7 @@ cat << EOF > "$SRCDIR"/ks.cfg
 #
 # This kickstart configuration defines the bare-minimum framework
 # for STIG-compliant Red Hat-based OS distribution installations.  
-# Project home: https://github.com/chuckmilam/stig-boot-iso
+# Project home: https://github.com/chuckmilam/create-ks-iso
 #
 # Main features: 
 #   1. FIPS mode option
