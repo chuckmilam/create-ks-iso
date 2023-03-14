@@ -25,6 +25,9 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 # Create new full boot ISO
 : "${CREATEBOOTISO:=false}" # Default if not defined
 
+# Insert ks.cfg in boot ISO (Cases where second OEMDRV ISO may not be an option)
+: "${KSINBOOTISO:=false}" # Default if not defined
+
 # Create OEMDRV volume ISO
 : "${CREATEOEMDRVISO:=false}" # Default if not defined
 
@@ -52,7 +55,7 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 # File Name for newly-created final ISO file
 : "${NEWISONAME:=$NEWISONAMEPREFIX$OEMSRCISO}" # Default if not defined
 
-# Kickstart config file, locate in $SRCDIR
+# Generated kickstart file name, default location is in $SRCDIR
 : "${KSCFGSRCFILE:=ks.cfg}" # Default if not defined
 
 # Best to not change this, some Red Hat internals look for this specific name
@@ -237,6 +240,17 @@ case $ENABLEFIPS in
     echo -e "$0: FIPS mode NOT enabled."
 esac
 
+# Warn if FIPS mode is set but CREATEBOOTISO is not set
+if [ "$ENABLEFIPS" = "true" ] && [ "$CREATEBOOTISO" = "false" ]; then
+  echo -e "$0:"
+  echo -e "$0: ***********************************************************"
+  echo -e "$0: * WARNING: FIPS mode is set and CREATEBOOTISO is NOT set. *" 
+  echo -e "$0: * WARNING: Insconsistent FIPS checks likely unless FIPS   *"
+  echo -e "$0: * WARNING: mode is set on grub kernel bootloader.         *"
+  echo -e "$0: ***********************************************************"
+  echo -e "$0:"
+fi
+
 ### Password Generation
 
 # If passwords not defined, generate passwords of either $passwd_len or a default 16 characters using python
@@ -255,14 +269,14 @@ case $WRITEPASSWDS in
   true)
   # Write passwords to files for testing/pipeline use 
   # Obviously insecure in the long run, change these if used on a long-lived system.
-  echo "$0: Writing plaintext passwords to $CREDSDIR."
+  echo "$0: Writing plaintext passwords to $CREDSDIR/"
   echo "$password" > "$CREDSDIR"/password.txt
   echo "$password_username_01" > "$CREDSDIR"/password_"${username_01}".txt
   echo "$password_username_02" > "$CREDSDIR"/password_"${username_02}".txt
   echo "$grub2_passwd" > "$CREDSDIR"/password_grub2.txt
   ;;
 *)
-    echo "$0: Plaintext passwords NOT written to $CREDSDIR."
+    echo "$0: Plaintext passwords NOT written to $CREDSDIR/"
 esac
 
 # Whether generated or defined, encrypt the passwords using python with a FIPS-compliant cypher
@@ -427,7 +441,7 @@ logvol /var/log  --fstype='xfs' --size=$LOGVOLSIZEVARLOG --name=varlog --vgname=
 # Ensure /var/tmp Located On Separate Partition
 logvol /var/tmp  --fstype='xfs' --size=$LOGVOLSIZEVARTMP --name=vartmp --vgname=vg00 --fsoptions='nodev,noexec,nosuid'
 # Ensure /var/log/audit Located On Separate Partition
-logvol /var/log/audit  --fstype='xfs' --size=$LOGVOLSIZEVARLOGAUDIT--name=varlogaudit --vgname=vg00 --fsoptions='nodev'
+logvol /var/log/audit  --fstype='xfs' --size=$LOGVOLSIZEVARLOGAUDIT --name=varlogaudit --vgname=vg00 --fsoptions='nodev'
 # Third-party tools and agents require free space in /opt
 logvol /opt  --fstype='xfs' --size=$LOGVOLSIZEOPT --name=opt --vgname=vg00 --fsoptions='nodev'
 
@@ -579,30 +593,47 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   # Copy ks.cfg into working dir
   cp "$SRCDIR"/"$KSCFGSRCFILE" "$WORKDIR"/"$KSCFGDESTFILENAME"
 
-  # Modify ISO boot menu and options
-  case $ENABLEFIPS in
-    true)
+  ## Modify ISO boot menu and options
+
+  # FIPS mode enabled, insert ks.cfg into boot ISO
+  if [ "$ENABLEFIPS" = "true" ] && [ "$KSINBOOTISO" = "true" ]; then
     # Modify isolinux.cfg for FIPS mode and ks boot
+    echo -e "$0: Setting FIPS mode and ks.cfg location in ISO bootloader"
     sed -i '/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/isolinux/isolinux.cfg
+    # Modify grub.cfg for FIPS mode and ks boot
+    sed -i '/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/EFI/BOOT/grub.cfg
     # Modify isolinux.cfg menu title
     sed -i 's/menu title Red/menu title RandomCreds FIPS Kickstart Install Red/' "$WORKDIR"/isolinux/isolinux.cfg
     # Modify grub.cfg menu entries to show RandomCreds
-    sed -i 's/Install/RandomCreds FIPS Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
-    sed -i 's/Test/RandomCreds FIPS Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
-    # Modify grub.cfg for ks boot
-    sed -i '/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/EFI/BOOT/grub.cfg
-    ;;
-  *)
-    # Modify isolinux.cfg ks boot
-    sed -i '/rescue/!s/ quiet/ inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/isolinux/isolinux.cfg
-    # Modify isolinux.cfg menu title
-    sed -i 's/menu title Red/menu title RandomCreds Kickstart Install Red/' "$WORKDIR"/isolinux/isolinux.cfg
-    # Modify grub.cfg menu entries to show RandomCreds
-    sed -i 's/Install/RandomCreds Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
-    sed -i 's/Test/RandomCreds Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
-    # Modify grub.cfg for ks boot
-    sed -i '/rescue/!s/ quiet/ inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/EFI/BOOT/grub.cfg
-  esac
+    sed -i 's/Install/FIPS mode with kickstart Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
+    sed -i 's/Test/FIPS mode with kickstart Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
+  fi
+
+  # No FIPS mode, insert ks.cfg into boot ISO
+  if [ "$ENABLEFIPS" = "false" ] && [ "$KSINBOOTISO" = "true" ]; then
+      # Modify isolinux.cfg ks boot, no FIPS mode
+      echo -e "$0: Setting ks.cfg location in ISO bootloader"
+      sed -i '/rescue/!s/ quiet/ inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/isolinux/isolinux.cfg
+      # Modify grub.cfg for ks boot, no FIPS mode
+      sed -i '/rescue/!s/ quiet/ inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/EFI/BOOT/grub.cfg
+      # Modify isolinux.cfg menu title
+      sed -i 's/menu title Red/menu title RandomCreds Kickstart Install Red/' "$WORKDIR"/isolinux/isolinux.cfg
+      # Modify grub.cfg menu entries to show RandomCreds
+      sed -i 's/Install/kickstart Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
+      sed -i 's/Test/kickstart Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
+  fi
+
+  # FIPS mode enabled, do not insert ks.cfg into boot ISO
+  if [ "$ENABLEFIPS" = "true" ] && [ "$KSINBOOTISO" = "false" ]; then
+      # Modify isolinux.cfg menu title
+      echo -e "$0: Setting FIPS mode in ISO bootloader"
+      sed -i 's/menu title Red/menu title RandomCreds Kickstart Install Red/' "$WORKDIR"/isolinux/isolinux.cfg
+      # Modify grub.cfg for FIPS mode
+      sed -i '/rescue/!s/ quiet/ rd.fips fips=1 quiet/' "$WORKDIR"/EFI/BOOT/grub.cfg
+      # Modify grub.cfg menu entries to show RandomCreds
+      sed -i 's/Install/FIPS mode Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
+      sed -i 's/Test/FIPS mode Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
+  fi
 
   # Create new ISO  
   # Note, the relative pathnames in the arguments to mkisofs are required, as per the man page:
@@ -649,7 +680,7 @@ if [ "$CREATEOEMDRVISO" = "true" ]; then
   chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR"/"$OEMDRVISOFILENAME".iso
 fi # End CREATEBOOTISO conditional
 
-# Chown/chmod password files and ssh keys
+# Chown/chmod kickstart files, pasword files, and ssh keys
 chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"
 
 if [ "$WRITEPASSWDS" = "true" ]; then
@@ -661,6 +692,10 @@ fi
 echo -e "$0: Setting ownership of ssh key files"
 chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"/*.id_rsa "$CREDSDIR"/*.pub
 chmod 700 "$CREDSDIR"
+
+echo -e "$0: Setting ownership of kickstart file"
+chown "$SUDO_UID":"$SUDO_GID" "$SRCDIR"/"$KSCFGSRCFILE"
+chmod 640 "$SRCDIR"/"$KSCFGSRCFILE"
 
 # Notify we're done here
 echo -n "$0: Total run time: "
