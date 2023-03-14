@@ -590,10 +590,7 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   # Unmount the OEM ISO
   umount "$ISOTMPMNT"
 
-  # Copy ks.cfg into working dir
-  cp "$SRCDIR"/"$KSCFGSRCFILE" "$WORKDIR"/"$KSCFGDESTFILENAME"
-
-  ## Modify ISO boot menu and options
+   ## Modify ISO boot menu and options
 
   # FIPS mode enabled, insert ks.cfg into boot ISO
   if [ "$ENABLEFIPS" = "true" ] && [ "$KSINBOOTISO" = "true" ]; then
@@ -607,6 +604,8 @@ if [ "$CREATEBOOTISO" = "true" ]; then
     # Modify grub.cfg menu entries to show RandomCreds
     sed -i 's/Install/FIPS mode with kickstart Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
     sed -i 's/Test/FIPS mode with kickstart Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
+    # Copy ks.cfg into working dir
+    cp "$SRCDIR"/"$KSCFGSRCFILE" "$WORKDIR"/"$KSCFGDESTFILENAME"
   fi
 
   # No FIPS mode, insert ks.cfg into boot ISO
@@ -621,6 +620,8 @@ if [ "$CREATEBOOTISO" = "true" ]; then
       # Modify grub.cfg menu entries to show RandomCreds
       sed -i 's/Install/kickstart Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
       sed -i 's/Test/kickstart Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
+      # Copy ks.cfg into working dir
+      cp "$SRCDIR"/"$KSCFGSRCFILE" "$WORKDIR"/"$KSCFGDESTFILENAME"
   fi
 
   # FIPS mode enabled, do not insert ks.cfg into boot ISO

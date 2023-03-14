@@ -92,7 +92,7 @@ Things to implement/improve:
     - [ ] Investigate use of Docker .env file instead of CONFIG_FILE
 - [ ] Complete CONFIG_FILE template with available variables
 - [ ] STIG oscap/anaconda plugin logic based on OS distribution and version
-- [x] Checks for required packages
+- [x] Checks for required packages for ISO creation
 - [ ] ksvalidator checks
 - [ ] Change ntpserver kickstart statement per major OS version (8.x vs 9.x)
 - [ ] Utilize "light" installer ISO for network-based installs
