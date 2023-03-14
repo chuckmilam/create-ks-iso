@@ -244,9 +244,9 @@ esac
 if [ "$ENABLEFIPS" = "true" ] && [ "$CREATEBOOTISO" = "false" ]; then
   echo -e "$0:"
   echo -e "$0: ***********************************************************"
-  echo -e "$0: * WARNING: FIPS mode is set and CREATEBOOTISO is NOT set. *" 
-  echo -e "$0: * WARNING: Insconsistent FIPS checks likely unless FIPS   *"
-  echo -e "$0: * WARNING: mode is set on grub kernel bootloader.         *"
+  echo -e "$0: *  WARNING: FIPS mode set while CREATEBOOTISO is NOT set. *" 
+  echo -e "$0: *  WARNING: Insconsistent FIPS checks are likely unless   *"
+  echo -e "$0: *  WARNING: FIPS mode is set on grub kernel bootloader.   *"
   echo -e "$0: ***********************************************************"
   echo -e "$0:"
 fi
@@ -449,7 +449,7 @@ logvol /opt  --fstype='xfs' --size=$LOGVOLSIZEOPT --name=opt --vgname=vg00 --fso
 logvol swap  --$LOGVOLSIZESWAP --fstype='swap' --name=swap --vgname=vg00 
 ## End boot partition information
 
-# STIG ID RHEL-08-10670: Disable kdump
+# STIG Requirement: Disable kdump
 %addon com_redhat_kdump --disable
 %end
 
@@ -610,13 +610,13 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   # FIPS mode enabled, insert ks.cfg into boot ISO
   if [ "$ENABLEFIPS" = "true" ] && [ "$KSINBOOTISO" = "true" ]; then
     # Modify isolinux.cfg for FIPS mode and ks boot
-    echo -e "$0: Setting FIPS mode and ks.cfg location in ISO bootloader"
+    echo -e "$0: Setting FIPS mode and ks.cfg location in ISO bootloader (FIPS: ON, kickstart in ISO: ON)"
     sed -i '/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/isolinux/isolinux.cfg
     # Modify grub.cfg for FIPS mode and ks boot
     sed -i '/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/EFI/BOOT/grub.cfg
     # Modify isolinux.cfg menu title
-    sed -i 's/menu title Red/menu title RandomCreds FIPS Kickstart Install Red/' "$WORKDIR"/isolinux/isolinux.cfg
-    # Modify grub.cfg menu entries to show RandomCreds
+    sed -i 's/menu label Install/menu label FIPS mode with kickstart Install/' "$WORKDIR"/isolinux/isolinux.cfg
+    # Modify grub.cfg menu entries
     sed -i 's/Install/FIPS mode with kickstart Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
     sed -i 's/Test/FIPS mode with kickstart Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
     # Copy ks.cfg into working dir
@@ -626,12 +626,12 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   # No FIPS mode, insert ks.cfg into boot ISO
   if [ "$ENABLEFIPS" = "false" ] && [ "$KSINBOOTISO" = "true" ]; then
       # Modify isolinux.cfg ks boot, no FIPS mode
-      echo -e "$0: Setting ks.cfg location in ISO bootloader"
+      echo -e "$0: Setting ks.cfg location in ISO bootloader (FIPS: OFF, kickstart in ISO: ON)"
       sed -i '/rescue/!s/ quiet/ inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/isolinux/isolinux.cfg
       # Modify grub.cfg for ks boot, no FIPS mode
       sed -i '/rescue/!s/ quiet/ inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/EFI/BOOT/grub.cfg
       # Modify isolinux.cfg menu title
-      sed -i 's/menu title Red/menu title RandomCreds Kickstart Install Red/' "$WORKDIR"/isolinux/isolinux.cfg
+      sed -i 's/menu label Install/menu label kickstart Install/' "$WORKDIR"/isolinux/isolinux.cfg
       # Modify grub.cfg menu entries to show RandomCreds
       sed -i 's/Install/kickstart Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
       sed -i 's/Test/kickstart Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
@@ -642,8 +642,8 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   # FIPS mode enabled, do not insert ks.cfg into boot ISO
   if [ "$ENABLEFIPS" = "true" ] && [ "$KSINBOOTISO" = "false" ]; then
       # Modify isolinux.cfg menu title
-      echo -e "$0: Setting FIPS mode in ISO bootloader"
-      sed -i 's/menu title Red/menu title RandomCreds Kickstart Install Red/' "$WORKDIR"/isolinux/isolinux.cfg
+      echo -e "$0: Setting FIPS mode in ISO bootloader (FIPS: ON, kickstart in ISO: OFF)"
+      sed -i 's/menu label Install/menu label FIPS mode Install/' "$WORKDIR"/isolinux/isolinux.cfg
       # Modify grub.cfg for FIPS mode
       sed -i '/rescue/!s/ quiet/ rd.fips fips=1 quiet/' "$WORKDIR"/EFI/BOOT/grub.cfg
       # Modify grub.cfg menu entries to show RandomCreds
@@ -713,7 +713,7 @@ echo -e "$0: Setting ownership of kickstart file"
 chown "$SUDO_UID":"$SUDO_GID" "$SRCDIR"/"$KSCFGSRCFILE"
 chmod 640 "$SRCDIR"/"$KSCFGSRCFILE"
 
-# Notify we're done here
+# Let everyone know we're done here
 echo -n "$0: Total run time: "
 printf '%dd:%dh:%dm:%ds\n' $((SECONDS/86400)) $((SECONDS%86400/3600)) $((SECONDS%3600/60)) \ $((SECONDS%60))
 echo -e "$0: Completed with exit code: $? at $(date)"
