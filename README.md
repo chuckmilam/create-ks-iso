@@ -75,6 +75,12 @@ Note the use of `sudo -E` to ensure the environment variables are passed into th
 CREATEBOOTISO="true" ENABLEFIPS="true" sudo -E ./create-ks-iso.sh
 ```
 
+### Generate a Custom RHEL Boot ISO with FIPS mode enabled with ks.cfg built-in
+This option bakes the kickstart file directly into the boot ISO, handy for systems limited to only a single bootable drive for the ISO image.
+Again, note the use of `sudo -E` to ensure the environment variables are passed into the sudo session.
+```Shell
+CREATEBOOTISO="true" KSINBOOTISO="true" ENABLEFIPS="true" sudo -E ./create-ks-iso.sh
+```
 ### Sanitize the working directories
 Run the sanitize script to remove any generated user credential, kickstart, and ISO files.
 ```Shell
@@ -98,6 +104,7 @@ Things to implement/improve:
 - [ ] Utilize "light" installer ISO for network-based installs
 - [x] Option to create FIPS-enabled boot ISO without baked-in kickstart file
 - [ ] Option to specify a different kickstart location (HTTP/S, NFS, etc.)
+- [x] Warning if setting FIPS mode without creating boot ISO
 
 ## History
 This script harkens back to when I first started using kickstart around 2007-2008 to automate the deployment of 200+ Linux workstations where systems had to be wiped and redeployed frequently. Later, adding requirements for STIG compliance brought on additional challenges. The increased pace of rapid prototyping and testing helped streamline it further. Now I'm looking to use it for automated pipeline testing in places where containers don't quite make sense yet.
