@@ -97,6 +97,7 @@ Things to implement/improve:
 - [ ] Change ntpserver kickstart statement per major OS version (8.x vs 9.x)
 - [ ] Utilize "light" installer ISO for network-based installs
 - [x] Option to create FIPS-enabled boot ISO without baked-in kickstart file
+- [ ] Option to specify a different kickstart location (HTTP/S, NFS, etc.)
 
 ## History
 This script harkens back to when I first started using kickstart around 2007-2008 to automate the deployment of 200+ Linux workstations where systems had to be wiped and redeployed frequently. Later, adding requirements for STIG compliance brought on additional challenges. The increased pace of rapid prototyping and testing helped streamline it further. Now I'm looking to use it for automated pipeline testing in places where containers don't quite make sense yet.
