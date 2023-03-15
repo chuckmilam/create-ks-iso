@@ -22,6 +22,9 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 # Source CONFIG_FILE for variables
 . "$SRCDIR/CONFIG_FILE"
 
+# Output directory name
+: "${OUTPUTDIR:=$SRCDIR/result}" # Default if not defined
+
 # Create new full boot ISO
 : "${CREATEBOOTISO:=false}" # Default if not defined
 
@@ -31,20 +34,20 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 # Create OEMDRV volume ISO
 : "${CREATEOEMDRVISO:=false}" # Default if not defined
 
-# OEMDRV volume ISO source directory
-: "${OEMDRVDIR:=$SRCDIR/oemdrv}" # Default if not defined
+# OEMDRV volume ISO output directory
+: "${OEMDRVDIR:=$OUTPUTDIR/oemdrv}" # Default if not defined
 
 # OEMDRV ISO File Name
 : "${OEMDRVISOFILENAME:=OEMDRV}" # Default if not defined
 
 # Location for generated credentials
-: "${CREDSDIR:=$SRCDIR/creds}" # Default if not defined
+: "${CREDSDIR:=$OUTPUTDIR/creds}" # Default if not defined
 
 # Source Media ISO Location
 : "${ISOSRCDIR:=$SRCDIR/isosrc}" # Default if not defined
 
 # ISO Result/Output Location
-: "${ISORESULTDIR:=$SRCDIR/result}" # Default if not defined
+: "${ISORESULTDIR:=$OUTPUTDIR/iso}" # Default if not defined
 
 # OEM Source Media File Name
 : "${OEMSRCISO:=CentOS-Stream-9-latest-x86_64-dvd1.iso}" # Default if not defined
@@ -58,11 +61,13 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 # Generated kickstart file name, default location is in $SRCDIR
 : "${KSCFGSRCFILE:=ks.cfg}" # Default if not defined
 
+# kickstart destination file name
 # Best to not change this, some Red Hat internals look for this specific name
 : "${KSCFGDESTFILENAME:=ks.cfg}" # Default if not defined
 
 # Temporary mount point for OEM Source Media
-ISOTMPMNT="$SRCDIR/mnt/iso"
+ISOMNTDIR="$SRCDIR/mnt"
+ISOTMPMNT="$ISOMNTDIR/iso"
 
 # No need to change this, not a permanent file
 SCRATCHISONAME="NEWISO.iso"
@@ -163,7 +168,7 @@ check_dependency () {
   fi
 }
 
-### Check for required files and directories
+### Check for required permissions
 
 if [ "$CREATEBOOTISO" = "true" ]; then
   # Check for required root privileges, needed to mount and extract OEM ISO
@@ -173,32 +178,57 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   fi
 fi
 
+### Check for required files and directories
+
+# Create output location if it does not exist (check for either directory or symlink existence)
+if [[ ! -d "$OUTPUTDIR" ]] && [[ ! -h "$OUTPUTDIR" ]]; then
+  echo "$0: Output directory $OUTPUTDIR not found. Creating."
+  mkdir -p "$OUTPUTDIR"
+  chmod -R 750 "$OUTPUTDIR"
+  echo -e "$0: Setting ownership of $OUTPUTDIR."
+  chown "$SUDO_UID":"$SUDO_GID" "$OUTPUTDIR"
+fi
+
 if [ "$CREATEBOOTISO" = "true" ] || [ "$CREATEOEMDRVISO" = "true" ]; then
   # Create ISO Result Location if it does not exist (check for either directory or symlink existence)
     if [[ ! -d "$ISORESULTDIR" ]] && [[ ! -h "$ISORESULTDIR" ]]; then
-    echo "$0: ISO result directory $ISOSRCDIR not found. Creating."
+    echo "$0: ISO result directory $ISORESULTDIR not found. Creating."
     mkdir -p "$ISORESULTDIR"
+    chmod -R 750 "$ISORESULTDIR"
     echo -e "$0: Setting ownership of $ISORESULTDIR."
     chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR"
   fi
 fi
 
-# Exit if ISO source location does not exist, required for creation of bootable ISO
-# Note: Don't create this automatically to avoid potentially clobbering a large ISO store
 if [ "$CREATEBOOTISO" = "true" ]; then
+  # Exit if ISO source location does not exist, required for creation of bootable ISO
+  # Note: Don't create this automatically to avoid potentially clobbering a large ISO store
   if [[ ! -d "$ISOSRCDIR" ]] && [[ ! -h "$ISOSRCDIR" ]]; then
     echo "$0: ISO source directory $ISOSRCDIR not found, please correct. Exiting."
     exit 1
   fi
-fi 
-
-# Exit if ISO source file does not exist, required for creation of bootable ISO
-if [ "$CREATEBOOTISO" = "true" ]; then
+  # Exit if ISO source file does not exist, required for creation of bootable ISO
   if [[ ! -f "$ISOSRCDIR/$OEMSRCISO" ]] ; then
     echo "$0: ISO source file $ISOSRCDIR/$OEMSRCISO not found, please correct. Exiting."
     exit 1
   fi
-fi
+  # Check for temporary ISO mount point, create if needed
+  if [[ ! -d "$ISOTMPMNT" ]] && [[ ! -h "$ISOTMPMNT" ]]; then
+    echo "$0: ISO temporary mount point $ISOTMPMNT not found. Creating."
+    mkdir -p "$ISOTMPMNT"
+    chmod -R 750 "$ISOTMPMNT"
+    echo -e "$0: Setting ownership of $ISOTMPMNT."
+    chown -R "$SUDO_UID":"$SUDO_GID" "$ISOTMPMNT"
+  fi
+  # Check for scratch space directory, create if needed
+  if [[ ! -d "$WORKDIR" ]] && [[ ! -h "$WORKDIR" ]]; then
+    echo "$0: Scratch space directory $WORKDIR not found. Creating."
+    mkdir -p "$WORKDIR"
+    chmod -R 750 "$WORKDIR"
+    echo -e "$0: Setting ownership of $WORKDIR."
+    chown -R "$SUDO_UID":"$SUDO_GID" "$WORKDIR"
+  fi
+fi 
 
 echo "$0: Required files and directory checks passed."
 
@@ -588,12 +618,6 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   # ISO Volume Name must match or boot will fail
   OEMSRCISOVOLNAME=$(blkid -o value "$ISOSRCDIR"/$OEMSRCISO | sed -n 3p)
 
-  # Create temporary mount point for OEM Source Media if it does not exist
-  mkdir -p "$ISOTMPMNT"
-
-  # Create scratch space directory
-  mkdir -p "$WORKDIR"
-
   # Mount OEM Install Media ISO
   mount -o ro "$ISOSRCDIR"/"$OEMSRCISO" "$ISOTMPMNT"
 
@@ -656,7 +680,7 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   # "The pathname must be relative to the source path..."
   # This is why we do the rather ugly "cd" into the working dir below.
   cd "$WORKDIR" || { echo "$0: Unable to change directory to $WORKDIR, exiting."; exit 1; }
-  echo -e "$0: Building new ISO image at $(date)."
+  echo -e "$0: Building modified ISO image at $(date)."
   mkisofs -quiet -o ../$SCRATCHISONAME -b isolinux/isolinux.bin -J -R -l -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e images/efiboot.img -no-emul-boot -graft-points -joliet-long -V "$OEMSRCISOVOLNAME" .
   cd "$SRCDIR" || { echo "$0: Unable to change directory to $SRCDIR, exiting."; exit 1; }
 
@@ -673,12 +697,12 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   mv "$SCRATCHDIR"/$SCRATCHISONAME "$ISORESULTDIR"/"$NEWISONAME"
 
   # Clean up work directory
-  echo -e "$0: Cleaning up $WORKDIR at $(date)"
+  echo -e "$0: Cleaning up temporary files at $(date)"
   rm -rf "$WORKDIR"
+  rm -rf "$SCRATCHDIR"
+  rm -rf "$ISOMNTDIR"
 
   # Chown new ISO and other generated files (will be owned by root otherwise)
-  echo -e "$0: Setting ownership of $ISOTMPMNT"
-  chown "$SUDO_UID":"$SUDO_GID" "$ISOTMPMNT"
   echo -e "$0: Setting ownership of $ISORESULTDIR/$NEWISONAME"
   chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR"/"$NEWISONAME"
   if [[ -f "$ISORESULTDIR"/"$OEMDRVISOFILENAME".iso ]]; then
@@ -689,11 +713,15 @@ fi
 
 if [ "$CREATEOEMDRVISO" = "true" ]; then
   echo -e "$0: Creating $OEMDRVISOFILENAME.iso at $(date)"
+  # Create OEMDRV scratch dir
   mkdir -p "$OEMDRVDIR"
+  chown "$SUDO_UID":"$SUDO_GID" "$OEMDRVDIR"
   rm -f "$OEMDRVDIR"/"$KSCFGDESTFILENAME" # Remove old ks.cfg
   cp "$SRCDIR"/"$KSCFGDESTFILENAME" "$OEMDRVDIR"
   mkisofs -quiet -V OEMDRV -o "$ISORESULTDIR"/"$OEMDRVISOFILENAME".iso "$OEMDRVDIR"
   chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR"/"$OEMDRVISOFILENAME".iso
+  rm -f "$OEMDRVDIR"/"$KSCFGDESTFILENAME" # Remove ks.cfg
+  rm -rf "$OEMDRVDIR"
 fi # End CREATEBOOTISO conditional
 
 # Chown/chmod kickstart files, pasword files, and ssh keys
@@ -712,6 +740,8 @@ chmod 700 "$CREDSDIR"
 echo -e "$0: Setting ownership of kickstart file"
 chown "$SUDO_UID":"$SUDO_GID" "$SRCDIR"/"$KSCFGSRCFILE"
 chmod 640 "$SRCDIR"/"$KSCFGSRCFILE"
+echo -e "$0: Moving kickstart file to $OUTPUTDIR"
+mv "$SRCDIR"/"$KSCFGSRCFILE" "$OUTPUTDIR"
 
 # Let everyone know we're done here
 echo -n "$0: Total run time: "
