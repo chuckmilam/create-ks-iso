@@ -26,6 +26,7 @@ Without a method to provide the encryption key/passphrase to unlock system parti
     * bash v4+
     * genisoimage
     * git
+    * grub2-tools-minimal
     * isomd5sum
     * OpenSSH
     * syslinux
@@ -87,6 +88,20 @@ Run the sanitize script to remove any generated user credential, kickstart, and 
 ./sanitize-create-ks-iso.sh
 ```
 Be sure to specify the same configuration/environment variables if any were used to change default path names in the initial run of `create-ks-iso.sh`.
+
+### Docker Usage
+This is still under development, but has been tested on Linux and Windows docker hosts. To use this, from the git cloned directory:
+
+1. Create a local ISO source directory where your OEM install ISO will reside. Default name is: "isosrc."
+2. Create a local directory for the generated files. Default name is: "result."
+3. Build the image:
+    ```
+    docker build -t chuckmilam/create-ks-iso:latest .
+    ```
+4. Then run the container. You can pass environment variables similar to running on a native Linux host. The example below is from a Windows host. Note the required use of the `--privileged` switch when building the boot iso, to allow mount of the ISO file system in the build script.
+    ```
+    docker run --privileged --env  WRITEPASSWDS="true" --env CREATEBOOTISO="true" --env ENABLEFIPS="true" --env KSINBOOTISO="true" --env password="Password1234" --env CREATEOEMDRVISO="true" --mount type=bind,source=${PWD}\result,target=/create-ks-iso/result --mount type=bind,source=${PWD}\isosrc,target=/create-ks-iso/isosrc chuckmilam/create-ks-iso:latest
+    ```
 
 ## Roadmap
 Things to implement/improve:
