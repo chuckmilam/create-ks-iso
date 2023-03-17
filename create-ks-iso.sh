@@ -161,7 +161,7 @@ generate_ssh_keys () {
 }
 
 check_dependency () {
-  if ! command -v $1 &> /dev/null
+  if ! command -v "$1" &> /dev/null
   then
       echo "$1 is a required dependency and was not found. Exiting."
       exit 1
@@ -273,11 +273,11 @@ esac
 # Warn if FIPS mode is set but CREATEBOOTISO is not set
 if [ "$ENABLEFIPS" = "true" ] && [ "$CREATEBOOTISO" = "false" ]; then
   echo -e "$0:"
-  echo -e "$0: ***********************************************************"
-  echo -e "$0: *  WARNING: FIPS mode set while CREATEBOOTISO is NOT set. *" 
-  echo -e "$0: *  WARNING: Insconsistent FIPS checks are likely unless   *"
-  echo -e "$0: *  WARNING: FIPS mode is set on grub kernel bootloader.   *"
-  echo -e "$0: ***********************************************************"
+  echo -e "$0: *************************************************************"
+  echo -e "$0: *  WARNING: FIPS mode set while CREATEBOOTISO is NOT set.   *" 
+  echo -e "$0: *  WARNING: Insconsistent FIPS checks likely unless the     *"
+  echo -e "$0: *  WARNING: system is installed with the modified boot ISO. *"
+  echo -e "$0: *************************************************************"
   echo -e "$0:"
 fi
 
@@ -616,7 +616,7 @@ EOF
 
 if [ "$CREATEBOOTISO" = "true" ]; then
   # ISO Volume Name must match or boot will fail
-  OEMSRCISOVOLNAME=$(blkid -o value "$ISOSRCDIR"/$OEMSRCISO | sed -n 3p)
+  OEMSRCISOVOLNAME=$(blkid -o value "$ISOSRCDIR"/"$OEMSRCISO" | sed -n 3p)
 
   # Mount OEM Install Media ISO
   mount -o ro "$ISOSRCDIR"/"$OEMSRCISO" "$ISOTMPMNT"
