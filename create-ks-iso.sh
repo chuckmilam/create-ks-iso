@@ -20,7 +20,7 @@ echo -e "$0: Starting at $(date)"
 SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 
 # Source CONFIG_FILE for variables
-. "$SRCDIR/CONFIG_FILE"
+. "$SRCDIR"/CONFIG_FILE
 
 # Output directory name
 : "${OUTPUTDIR:=$SRCDIR/result}" # Default if not defined
