@@ -61,7 +61,7 @@ To generate a kickstart file, simply run the script:
 ```
 ./create-ks-iso.sh
 ```
-This command will generate a kickstart file in the current directory. Note FIPS mode is not enabled by default. This may not meet STIG compliance requirements.
+This command will generate a kickstart file in the current directory. Note FIPS mode is not enabled in the generated kickstart file. This may not meet STIG compliance requirements.
 
 ### Generate an OEMDRV volume ISO
 This ISO volume allows the kickstart file to be detected and run by the system installer with no manual intervention required. In the most common cases, the system install ISO is attached to the machine in the first CD/DVD drive. 
