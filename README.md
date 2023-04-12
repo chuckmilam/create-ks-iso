@@ -103,7 +103,7 @@ This is still under development, but has been tested on Linux and Windows docker
     docker run --privileged --env  WRITEPASSWDS="true" --env CREATEBOOTISO="true" --env ENABLEFIPS="true" --env KSINBOOTISO="true" --env password="Password1234" --env CREATEOEMDRVISO="true" --mount type=bind,source=${PWD}\result,target=/create-ks-iso/result --mount type=bind,source=${PWD}\isosrc,target=/create-ks-iso/isosrc chuckmilam/create-ks-iso:latest
     ```
 
-The fedora:latest image is used rather than the Red Hat UBI simply because `genisoimage` is not available in the UBI repos.
+The `fedora:latest` image is used rather than the Red Hat UBI simply because `genisoimage` is not available in the UBI repos.
 
 ## Roadmap
 Things to implement/improve:
