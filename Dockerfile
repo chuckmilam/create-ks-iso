@@ -1,4 +1,4 @@
-FROM almalinux:latest AS basebuild
+FROM fedora:latest AS basebuild
 
 RUN dnf -y install bash dos2unix genisoimage grub2-tools-minimal isomd5sum openssh syslinux python3
 
