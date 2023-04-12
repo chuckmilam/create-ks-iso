@@ -89,7 +89,7 @@ Run the sanitize script to remove any generated user credential, kickstart, and 
 ```
 Be sure to specify the same configuration/environment variables if any were used to change default path names in the initial run of `create-ks-iso.sh`.
 
-### Docker Usage
+### Docker/Podman Usage
 This is still under development, but has been tested on Linux and Windows docker hosts. To use this, from the git cloned directory:
 
 1. Create a local ISO source directory where your OEM install ISO will reside. Default name is: "isosrc."
@@ -98,10 +98,12 @@ This is still under development, but has been tested on Linux and Windows docker
     ```
     docker build -t chuckmilam/create-ks-iso:latest .
     ```
-4. Then run the container. You can pass environment variables similar to running on a native Linux host. The example below is from a Windows host. Note the required use of the `--privileged` switch when building the boot iso, to allow mount of the ISO file system in the build script.
+4. Then run the container. You can pass environment variables similar to running on a native Linux host. *The example below is shown using a Windows Docker host.* Note the required use of the `--privileged` switch when building the boot iso, to allow mount of the ISO file system in the build script.
     ```
     docker run --privileged --env  WRITEPASSWDS="true" --env CREATEBOOTISO="true" --env ENABLEFIPS="true" --env KSINBOOTISO="true" --env password="Password1234" --env CREATEOEMDRVISO="true" --mount type=bind,source=${PWD}\result,target=/create-ks-iso/result --mount type=bind,source=${PWD}\isosrc,target=/create-ks-iso/isosrc chuckmilam/create-ks-iso:latest
     ```
+
+The fedora:latest image is used rather than the Red Hat UBI simply because `genisoimage` is not available in the UBI repos.
 
 ## Roadmap
 Things to implement/improve:
