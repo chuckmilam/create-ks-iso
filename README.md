@@ -1,4 +1,4 @@
-# create-ks-iso
+# Create kickstart (ISO)
 Dynamically creates a STIG-compliant kickstart file with randomly-generated bootstrap user credentials for compliance testing in an automation pipeline. Includes options for creating custom install ISO images to enable non-interactive FIPS-compliant installations of RHEL-based Linux distributions.
 
 ## Overview
@@ -12,12 +12,12 @@ There are two aspects of RHEL STIG compliance efforts that realistically must be
 This project attempts to address both challenges.
 
 #### FIPS Mode
-While FIPS mode can be enabled after the OS install, it is [not the recommended practice](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/security_hardening/assembly_installing-a-rhel-8-system-with-fips-mode-enabled_security-hardening#proc_installing-the-system-with-fips-mode-enabled_assembly_installing-a-rhel-8-system-with-fips-mode-enabled) and can leave the system in an inconsistent state. Anecdotally, inspectors and auditors may ask for proof that the system was installed with FIPS enabled rather than switched on after an install. Therefore, where FIPS mode is required, it is recommended to create the modified boot ISO (set CREATEBOOTISO="true") option here and then use it to install the OS.
+While FIPS mode can be enabled after the OS install, it is [not the recommended practice](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/security_hardening/assembly_installing-a-rhel-8-system-with-fips-mode-enabled_security-hardening#proc_installing-the-system-with-fips-mode-enabled_assembly_installing-a-rhel-8-system-with-fips-mode-enabled) and can leave the system in an inconsistent state. Anecdotally, inspectors/auditors may ask for proof that the system was installed with FIPS enabled rather than switched on after an install. Therefore, where FIPS mode is required, it is recommended to create the modified boot ISO (set CREATEBOOTISO="true") option here and then use it to install the OS.
 
 #### Whole-Disk Encryption
 The RHEL 8 STIG introduced the *de facto* requirement that [all system partitions are encrypted](https://www.stigviewer.com/stig/red_hat_enterprise_linux_8/2021-06-14/finding/V-230224), unless *"...there is a documented and approved reason for not having data-at-rest encryption...."* 
 
-Again, anecdotally, it's easier to comply with the STIG check than try to argue with an inspector or auditor about just what *"documented and approved"* means. 
+Again, anecdotally, it is easier to comply with the STIG check than try to argue with an inspector or auditor about just what *"documented and approved"* means. 
 
 Without a method to provide the encryption key/passphrase to unlock system partitions, the system will hang at boot waiting for the passphrase to be typed in at the console. If each individual partition is encrypted, then a passphrase must be entered for every one. This project provides a method of "baking in" the keyfile to auto-decrypt the system partitions without the need to set up a clevis/tang environment. By encrypting the LVM physical volume instead of the logical volumes, resize operations can occur while leaving disk encryption in place.
 
@@ -110,6 +110,7 @@ Things to implement/improve:
     - [ ] NTP configuration
     - [ ] Network settings
 - [ ] DOCKERFILE for portability
+    - [ ] Find a RHEL base image to use in place of Alma Linux
     - [ ] Investigate use of Docker .env file instead of CONFIG_FILE
 - [ ] Complete CONFIG_FILE template with available variables
 - [ ] STIG oscap/anaconda plugin logic based on OS distribution and version
@@ -122,7 +123,7 @@ Things to implement/improve:
 - [x] Warning if setting FIPS mode without creating boot ISO
 
 ## History
-This script harkens back to when I first started using kickstart around 2007-2008 to automate the deployment of 200+ Linux workstations where systems had to be wiped and redeployed frequently. Later, adding requirements for STIG compliance brought on additional challenges. The increased pace of rapid prototyping and testing helped streamline it further. Now I'm looking to use it for automated pipeline testing in places where containers don't quite make sense yet.
+This script harkens back to when I first started using kickstart sometime around 2007-2008 to automate the deployment of 200+ Linux workstations where the systems had to be securely wiped and redeployed frequently. Later, adding requirements for STIG compliance brought on additional challenges. The increased pace of rapid prototyping and testing helped streamline it further. Now I'm looking to use it for automated pipeline testing in places where containers don't quite make sense yet.
 
 ## Acknowledgments
 This project utilized the following resources:
