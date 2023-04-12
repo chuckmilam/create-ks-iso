@@ -2,10 +2,10 @@
 Dynamically creates a STIG-compliant kickstart file with randomly-generated bootstrap user credentials for compliance testing in an automation pipeline. Includes options for creating custom install ISO images to enable non-interactive FIPS-compliant installations of RHEL-based Linux distributions.
 
 ## Overview
-create-ks-iso is intended to be a simple, lightweight, dynamic solution to generate a STIG-compliant kickstart file and installer boot ISO image. Optionally, the user can create an OEMDRV ISO for delivering the kickstart file to the system installer; useful in environments where PXE boot or similar network delivery methods may not be available. Bootstrap user credentials may be either randomly-generated or specifically declared as required to fit operational needs. The kickstart file can be tailored at the point of generation. Default settings are easily changed either by editing the included [CONFIG_FILE](CONFIG_FILE) template or by setting environment variables at runtime, ideally allowing for use in automation pipelines.
+create-ks-iso.sh is intended to be a simple, lightweight, dynamic solution to generate a STIG-compliant kickstart file and installer boot ISO image. Optionally, the user can create an OEMDRV ISO for delivering the kickstart file to the system installer; useful in environments where PXE boot or similar network delivery methods may not be available. Bootstrap user credentials may be either randomly-generated or specifically declared as required to fit operational needs. The kickstart file can be tailored at the point of generation. Default settings are easily changed either by editing the included [CONFIG_FILE](CONFIG_FILE) template or by setting environment variables at runtime, potentially allowing for use in automation pipelines.
 
 ### The Challenges of RHEL STIG Compliance
-There are two aspects of RHEL STIG compliance efforts that realistically must be addressed at install time: 
+There are two aspects of RHEL STIG compliance efforts that realistically should be addressed at install time: 
 1. Setting Federal Information Processing Standard (FIPS) 140-2 mode
 2. Configuring whole-disk encryption
 
@@ -51,7 +51,7 @@ The default settings will generate a kickstart file (ks.cfg) in the current work
 No ISOs are created unless the default settings are changed.
 
 ## Usage
-create-ks-iso attempts to be flexible to fit various use cases. Some examples follow.
+create-ks-iso attempts to be flexible to fit various use cases. Some examples:
 
 ### Customize Script Settings
 Variables can be set by editing the [CONFIG_FILE](CONFIG_FILE) directly, or by using environment variables. 
@@ -77,7 +77,7 @@ CREATEBOOTISO="true" ENABLEFIPS="true" sudo -E ./create-ks-iso.sh
 ```
 
 ### Generate a Custom RHEL Boot ISO with FIPS mode enabled with ks.cfg built-in
-This option bakes the kickstart file directly into the boot ISO, handy for systems limited to only a single bootable drive for the ISO image.
+This option bakes the kickstart file directly into the boot ISO, useful for systems limited to only a single bootable drive for the ISO image.
 Again, note the use of `sudo -E` to ensure the environment variables are passed into the sudo session.
 ```Shell
 CREATEBOOTISO="true" KSINBOOTISO="true" ENABLEFIPS="true" sudo -E ./create-ks-iso.sh
