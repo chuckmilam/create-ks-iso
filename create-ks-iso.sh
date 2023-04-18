@@ -275,7 +275,7 @@ if [ "$ENABLEFIPS" = "true" ] && [ "$CREATEBOOTISO" = "false" ]; then
   echo -e "$0:"
   echo -e "$0: *************************************************************"
   echo -e "$0: *  WARNING: FIPS mode set while CREATEBOOTISO is NOT set.   *" 
-  echo -e "$0: *  WARNING: Insconsistent FIPS checks likely unless the     *"
+  echo -e "$0: *  WARNING: Inconsistent FIPS checks likely unless the      *"
   echo -e "$0: *  WARNING: system is installed with the modified boot ISO. *"
   echo -e "$0: *************************************************************"
   echo -e "$0:"
