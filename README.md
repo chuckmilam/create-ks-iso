@@ -112,7 +112,7 @@ Things to implement/improve:
     - [ ] NTP configuration
     - [ ] Network settings
 - [ ] DOCKERFILE for portability
-    - [ ] Find a RHEL base image to use in place of Alma Linux
+    - [ ] Find a RHEL base image that has what we need
     - [ ] Investigate use of Docker .env file instead of CONFIG_FILE
 - [ ] Complete CONFIG_FILE template with available variables
 - [ ] STIG oscap/anaconda plugin logic based on OS distribution and version
