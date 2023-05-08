@@ -36,6 +36,8 @@ Without a method to provide the encryption key/passphrase to unlock system parti
     * root/sudo permissions in order to mount the ISO image.
     * Sufficient disk space for ISO creation. Enough is needed for the source OEM install ISO, temporary space for the extracted OEM install ISO, and then the final custom boot ISO. Consider that RHEL 8 and 9 boot ISOs are between 9-12G in size, so plan on at least triple that.
 
+There is also a [container-based option](#docker/podman-usage) that has been tested with Docker/Podman.
+
 ## Installation
 No installation is required, and this can be run directly from a user home directory.
 To use create-ks-iso, simply clone the GitHub repository:
@@ -125,7 +127,7 @@ Things to implement/improve:
 - [x] Warning if setting FIPS mode without creating boot ISO
 
 ## History
-This script harkens back to when I first started using kickstart sometime around 2007-2008 to automate the deployment of 200+ Linux workstations where the systems had to be securely wiped and redeployed frequently. Later, adding requirements for STIG compliance brought on additional challenges. The increased pace of rapid prototyping and testing helped streamline it further. Now I'm looking to use it for automated pipeline testing in places where containers don't quite make sense yet.
+The initial script harkens back to when I first started using kickstart sometime around 2007-2008 to automate the deployment of 200+ Linux workstations where the systems had to be securely wiped and redeployed frequently. Later, adding requirements for STIG compliance brought on additional challenges. The increased pace of rapid prototyping and testing helped streamline it further. Now I'm looking to use it for automated pipeline testing in places where containers don't quite make sense.
 
 ## Acknowledgments
 This project utilized the following resources:
