@@ -92,7 +92,9 @@ Run the sanitize script to remove any generated user credential, kickstart, and 
 Be sure to specify the same configuration/environment variables if any were used to change default path names in the initial run of `create-ks-iso.sh`.
 
 ### Docker or Podman Usage
-This is still under development, but has been tested on Linux and Windows docker hosts. To use this, from the git cloned directory:
+This has been tested on Linux and Windows docker hosts, and is still under development. 
+
+To get started, from the git cloned directory (example below uses docker, but podman should be a drop-in replacement for this use case):
 
 1. Create a local ISO source directory where your OEM install ISO will reside. Default name is: "isosrc."
 2. Create a local directory for the generated files. Default name is: "result."
@@ -113,7 +115,7 @@ Things to implement/improve:
     - [x] Disk partition sizes
     - [ ] NTP configuration
     - [ ] Network settings
-- [ ] DOCKERFILE for portability
+- [x] DOCKERFILE for portability
     - [ ] Find a RHEL base image that has what we need
     - [ ] Investigate use of Docker .env file instead of CONFIG_FILE
 - [ ] Complete CONFIG_FILE template with available variables
