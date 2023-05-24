@@ -115,9 +115,10 @@ Things to implement/improve:
     - [x] Disk partition sizes
     - [ ] NTP configuration
     - [ ] Network settings
-- [x] DOCKERFILE for portability
-    - [ ] Find a RHEL base image that has what we need
+- [x] DOCKERFILE for portability and network functionality
+    - [ ] Find a RHEL base image that has the needed packages available
     - [ ] Investigate use of Docker .env file instead of CONFIG_FILE
+    - [ ] Docker configuration for network kickstart delivery
 - [ ] Complete CONFIG_FILE template with available variables
 - [ ] STIG oscap/anaconda plugin logic based on OS distribution and version
 - [x] Checks for required packages for ISO creation

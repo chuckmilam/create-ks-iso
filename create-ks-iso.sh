@@ -371,8 +371,8 @@ cat << EOF > "$SRCDIR"/ks.cfg
 #
 # Design Philosopy: 
 #   Only minimal system configurations should be made here, those required at 
-#   install time. Further STIG compliance should be accomplished with a 
-#   system configuration tool such as Ansible.
+#   install time. Further STIG compliance and system configuration should be 
+#   accomplished with Ansible or similar tools.
 #  
 # Assumptions: 
 #   1. PXE boot is NOT an option, requiring use of the ISOs.
