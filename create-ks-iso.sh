@@ -351,7 +351,7 @@ LUKSDEV="/dev/sda3"
 # Main Section #
 ################
 
-### Write out header and append required lines to kickstart file (ks.cfg)
+### Write out header and append required lines to kickstart file
 
 cat << EOF > "$SRCDIR"/ks.cfg
 #################################################
