@@ -111,6 +111,7 @@ The `fedora:latest` image is used instead of the Red Hat UBI because `genisoimag
 
 ## Roadmap
 Things to implement/improve:
+- [ ] Replace soon-to-be-deprecated python `crypt` module in `encrypt_random_passwd` function.
 - [ ] Make configurable as variables in ks.cfg:
     - [x] Disk partition sizes
     - [ ] NTP configuration
