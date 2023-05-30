@@ -110,10 +110,16 @@ To get started, from the git cloned directory (example below uses docker, but po
     ```
 4. Then run the container. You can pass environment variables similar to running on a native Linux host. *The example below is shown using a Windows Docker host.* Note the required use of the `--privileged` switch when building the boot iso, to allow mount of the ISO file system in the build script.
     ```
-    docker run --privileged --env  WRITEPASSWDS="true" --env CREATEBOOTISO="true" --env ENABLEFIPS="true" --env KSINBOOTISO="true" --env password="Password1234" --env CREATEOEMDRVISO="true" --mount type=bind,source=${PWD}\result,target=/create-ks-iso/result --mount type=bind,source=${PWD}\isosrc,target=/create-ks-iso/isosrc chuckmilam/create-ks-iso:latest
+    docker run --privileged --env WRITEPASSWDS="true" --env CREATEBOOTISO="true" --env ENABLEFIPS="true" --env KSINBOOTISO="true" --env password="Password1234" --env CREATEOEMDRVISO="true" --mount type=bind,source=${PWD}\result,target=/create-ks-iso/result --mount type=bind,source=${PWD}\isosrc,target=/create-ks-iso/isosrc chuckmilam/create-ks-iso:latest
     ```
 
-The `fedora:latest` image is used instead of the Red Hat UBI because `genisoimage` is not available in the UBI repos. While the Fedora image is not the smallest image, it is not worth the hassle to try to wedge `genisoimage` for this small use case at the moment. Perhaps later when CI/CD pipeline optimization becomes important, we can revisit it.
+    Here is the Linux version of the above. The only change is the Linux vs. Windows directory path syntax:
+
+    ```
+    docker run --privileged --env WRITEPASSWDS="true" --env CREATEBOOTISO="true" --env ENABLEFIPS="true" --env KSINBOOTISO="true" --env password="Password1234" --env CREATEOEMDRVISO="true" --mount type=bind,source=./result,target=/create-ks-iso/result --mount type=bind,source=./isosrc,target=/create-ks-iso/isosrc chuckmilam/create-ks-iso:latest
+    ```
+
+The `fedora:latest` image is used instead of the Red Hat UBI because `genisoimage` is not available in the UBI repos. While the Fedora image is not the smallest image, it is not worth the hassle to try to wedge `genisoimage` for this small use case at the moment. 
 
 ## Roadmap
 Things to implement/improve:
