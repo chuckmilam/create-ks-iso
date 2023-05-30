@@ -12,7 +12,7 @@ There are two aspects of RHEL STIG compliance efforts that realistically should 
 This project attempts to address both challenges.
 
 #### FIPS Mode
-While FIPS mode can be enabled after the OS install, it is not the recommended practice and can leave the system in an inconsistent state.
+While FIPS mode can be enabled after the OS install, it is not the recommended practice and can leave the system in an inconsistent state on first boot when testing for FIPS mode.
 
 Per the [RHEL 9 Security Hardening Guide](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/security_hardening/assembly_installing-the-system-in-fips-mode_security-hardening#proc_installing-the-system-with-fips-mode-enabled_assembly_installing-the-system-in-fips-mode) (Red Hat login may be required to access.):
 
