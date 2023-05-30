@@ -234,6 +234,9 @@ echo "$0: Required files and directory checks passed."
 
 ### Check for required packages
 
+# Required to create grub bootloader password hashes
+check_dependency grub2-mkpasswd-pbkdf2
+
 # If passwords are not defined, they'll be generated with python3
 if [[ -z "$password" || -z "$password_username_01" || -z "$password_username_02" ]] ; then
   check_dependency python3
