@@ -42,7 +42,7 @@ Without a method to provide the encryption key/passphrase to unlock system parti
     * root/sudo permissions in order to mount the ISO image.
     * Sufficient disk space for ISO creation. Enough is needed for the source OEM install ISO, temporary space for the extracted OEM install ISO, and then the final custom boot ISO. Consider that RHEL 8 and 9 boot ISOs are between 9-12G in size, so plan on at least triple that.
 
-There is also a [container-based option](#docker-or-podman-usage) that has been tested with Docker/Podman.
+There is also a [container-based option](#docker-or-podman-usage) that has been tested with Docker/Podman. This method frees up the need to chase dependencies on the host system, and even works on Windows hosts.
 
 ## Installation
 No installation is required, and this can be run directly from a user home directory.
@@ -55,7 +55,7 @@ Once the repository is cloned, change into the project directory and run the scr
 cd create-ks-iso
 ./create-ks-iso.sh
 ```
-The default settings will generate a kickstart file (ks.cfg) in the current working directory, as well as some SSH keys in the "creds" directory. 
+Assuming all dependency checks pass, the default settings will generate a kickstart file (ks.cfg) in the current working directory, as well as some SSH keys in the "creds" directory. 
 No ISOs are created unless the default settings are changed.
 
 ## Usage
