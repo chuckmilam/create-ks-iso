@@ -96,10 +96,7 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 : "${username_02:=alt.admin}" # Default if not defined
 : "${username_02_gecos:=Emergency Admin Account}" # Default if not defined 
 
-# Password length in bytes 
-# Note: The python secrets module output is Base64 encoded, so on average each byte 
-# results in approximately 1.3 characters. 
-# Source: https://docs.python.org/3/library/secrets.html
+# Password length 
 : "${passwd_len:=16}" # Default if not defined
 
 #######################
@@ -143,11 +140,11 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 ########################
 
 generate_random_passwd () {
-  (passwd_len=$passwd_len python3 -c 'import os; import sys; import secrets; import string; print("".join(secrets.token_urlsafe(int(os.environ["passwd_len"]))))')
+  (passwd_len=$passwd_len openssl rand -base64 32 | tr -d /=+ | cut -c -"$passwd_len")
 }
 
 encrypt_random_passwd () {
-  (python3 -c "import crypt,getpass; print(crypt.crypt('$1', crypt.mksalt(crypt.METHOD_SHA512)))") # SHA512 should be FIPS-compliant, also OK on non-FIPS systems
+  (openssl passwd -6 "$1") # SHA512 should be FIPS-compliant, also OK on non-FIPS systems
 }
 
 generate_ssh_keys () { 
@@ -237,9 +234,9 @@ echo "$0: Required files and directory checks passed."
 # Required to create grub bootloader password hashes
 check_dependency grub2-mkpasswd-pbkdf2
 
-# If passwords are not defined, they'll be generated with python3
+# If passwords are not defined, they'll be generated with openssl
 if [[ -z "$password" || -z "$password_username_01" || -z "$password_username_02" ]] ; then
-  check_dependency python3
+  check_dependency openssl
 fi
 
 if [[ -z "$ssh_pub_key_username_01" || -z "$ssh_pub_key_username_02" ]] ; then
@@ -286,8 +283,7 @@ fi
 
 ### Password Generation
 
-# If passwords not defined, generate passwords of either $passwd_len or a default 16 characters using python
-# Change the number at the end of the python-one liner to set password length
+# If passwords not defined, generate passwords of either $passwd_len or a default 16 characters using openssl
 : "${password:=$( generate_random_passwd )}" || { echo "$0: root password generation ERROR, exiting..."; exit 1; }
 : "${password_username_01:=$( generate_random_passwd )}" || { echo "$0: $username_01 password generation ERROR, exiting..."; exit 1; }
 : "${password_username_02:=$( generate_random_passwd )}" || { echo "$0: $username_02 password generation ERROR, exiting..."; exit 1; }
@@ -312,7 +308,7 @@ case $WRITEPASSWDS in
     echo "$0: Plaintext passwords NOT written to $CREDSDIR/"
 esac
 
-# Whether generated or defined, encrypt the passwords using python with a FIPS-compliant cypher
+# Whether generated or defined, encrypt the passwords using openssl with a FIPS-compliant cypher
 encrypted_password=$( encrypt_random_passwd "$password" ) || { echo "$0: root password encryption ERROR, exiting..."; exit 1; }
 encrypted_password_username_01=$( encrypt_random_passwd "$password_username_01"  ) || { echo "$0: $username_01 password encryption ERROR, exiting..."; exit 1; }
 encrypted_password_username_02=$( encrypt_random_passwd "$password_username_02" ) || { echo "$0: $username_02 password encryption ERROR, exiting..."; exit 1; }
