@@ -28,21 +28,21 @@ Again, anecdotally, it is easier to comply with the STIG check than try to argue
 Without a method to provide the encryption key/passphrase to unlock system partitions, the system will hang at boot waiting for the passphrase to be typed in at the console. If each individual partition is encrypted, then a passphrase must be entered for every one. This project provides a method of "baking in" the keyfile to auto-decrypt the system partitions without the need to set up a clevis/tang environment. By encrypting the LVM physical volume instead of the logical volumes, resize operations can occur while leaving disk encryption in place.
 
 ## Requirements
-* A Linux system (RHEL/CentOS, Ubuntu, and WSL have all been tested successfully) with these packages installed:
+* A Linux system. RHEL/CentOS, Ubuntu, and WSL have all been tested successfully, but primary focus has been on Red Hat-derived distributions. System should have these packages installed:
     * bash v4+
     * genisoimage
     * git
     * grub2-tools-minimal
     * isomd5sum
     * OpenSSH
+    * OpenSSL
     * syslinux
-    * python
 * When creating a custom boot ISO:
     * RHEL-based full install ISO, readable by the user running the script.
     * root/sudo permissions in order to mount the ISO image.
-    * Sufficient disk space for ISO creation. Enough is needed for the source OEM install ISO, temporary space for the extracted OEM install ISO, and then the final custom boot ISO. Consider that RHEL 8 and 9 boot ISOs are between 9-12G in size, so plan on at least triple that.
+    * Sufficient disk space for ISO creation. Enough is needed for the source OEM install ISO, temporary space for the extracted OEM install ISO, and then the final custom boot ISO. Consider that RHEL 8 and 9 boot ISOs are between 9-12G in size, so plan on at least 3x that size.
 
-There is also a [container-based option](#docker-or-podman-usage) that has been tested with Docker/Podman. This method frees up the need to chase dependencies on the host system, and even works on Windows hosts.
+There is also a [container-based option](#docker-or-podman-usage) that has been tested with Docker/Podman. This method frees up the need to [chase dependencies](#requirements) on the host system, and it even works on Windows hosts, good for chicken-and-egg problems in Microsoft-first environments.
 
 ## Installation
 No installation is required, and this can be run directly from a user home directory.
@@ -123,7 +123,7 @@ The `fedora:latest` image is used instead of the Red Hat UBI because `genisoimag
 
 ## Roadmap
 Things to implement/improve:
-- [ ] Replace soon-to-be-deprecated python `crypt` module in `encrypt_random_passwd` function.
+- [x] Replace soon-to-be-deprecated python `crypt` module in `encrypt_random_passwd` function.
 - [ ] Make configurable as variables in ks.cfg:
     - [x] Disk partition sizes
     - [ ] NTP configuration
@@ -148,6 +148,7 @@ The initial script harkens back to when I first started using kickstart sometime
 ## Acknowledgments
 This project utilized the following resources:
 * [How to create a modified Red Hat Enterprise Linux ISO with kickstart file or modified installation media](https://access.redhat.com/solutions/60959)
+* [How to generate a SHA-2 (sha256 or sha512) hashed password compatible with /etc/shadow](https://access.redhat.com/solutions/221403)
 * [Appendix B. Kickstart commands and options reference](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/performing_an_advanced_rhel_9_installation/kickstart-commands-and-options-reference_installing-rhel-as-an-experienced-user)
 * [How to configure a keyfile in kickstart](https://access.redhat.com/solutions/4349431)
 * [Configuring manual enrollment of LUKS-encrypted volumes using a TPM 2.0 policy](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/security_hardening/configuring-automated-unlocking-of-encrypted-volumes-using-policy-based-decryption_security-hardening#configuring-manual-enrollment-of-volumes-using-tpm2_configuring-automated-unlocking-of-encrypted-volumes-using-policy-based-decryption)
