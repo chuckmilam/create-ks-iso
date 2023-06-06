@@ -170,7 +170,7 @@ check_dependency () {
 if [ "$CREATEBOOTISO" = "true" ]; then
   # Check for required root privileges, needed to mount and extract OEM ISO
   if [ "$EUID" -ne 0 ]
-    then echo "$0: In order to create the boot ISO, this script need root privileges for the \"mount\" command. Please run with sudo or su."
+    then echo "$0: In order to create the boot ISO, root privileges are required for the \"mount\" command. Please run with sudo or su."
     exit
   fi
 fi
