@@ -1,5 +1,7 @@
 FROM fedora:latest AS basebuild
 
+LABEL maintainer="chuck@milams.net"
+
 RUN dnf -y install bash dos2unix genisoimage grub2-tools-minimal isomd5sum openssh syslinux python3
 
 WORKDIR /create-ks-iso
