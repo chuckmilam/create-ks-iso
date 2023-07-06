@@ -614,8 +614,9 @@ chmod 000 /crypto_keyfile.bin
 EOF
 
 if [ "$CREATEBOOTISO" = "true" ]; then
+  # Capture output from blkid and load into variables. ($LABEL is what we need for mkisofs below.)
   # ISO Volume Name must match or boot will fail
-  OEMSRCISOVOLNAME=$(blkid -o value "$ISOSRCDIR"/"$OEMSRCISO" | sed -n 3p)
+  eval "$(blkid -o export "$ISOSRCDIR"/"$OEMSRCISO")"
 
   # Mount OEM Install Media ISO
   mount -o ro "$ISOSRCDIR"/"$OEMSRCISO" "$ISOTMPMNT"
@@ -680,7 +681,7 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   # This is why we do the rather ugly "cd" into the working dir below.
   cd "$WORKDIR" || { echo "$0: Unable to change directory to $WORKDIR, exiting."; exit 1; }
   echo -e "$0: Building modified ISO image at $(date)."
-  mkisofs -quiet -o ../$SCRATCHISONAME -b isolinux/isolinux.bin -J -R -l -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e images/efiboot.img -no-emul-boot -graft-points -joliet-long -V "$OEMSRCISOVOLNAME" .
+  mkisofs -quiet -o ../$SCRATCHISONAME -b isolinux/isolinux.bin -J -R -l -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e images/efiboot.img -no-emul-boot -graft-points -joliet-long -V "$LABEL" .
   cd "$SRCDIR" || { echo "$0: Unable to change directory to $SRCDIR, exiting."; exit 1; }
 
   # Build UEFI bootable image
