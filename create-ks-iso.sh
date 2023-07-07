@@ -10,6 +10,17 @@
 # Show startup with timestamp on console
 echo -e "$0: Starting at $(date)"
 
+####################
+## Meta Variables ##
+####################
+
+# Set default OS to RHEL
+: "${OSTYPE:=RHEL}" # Default if not defined
+
+# Major OS Version number
+# We need this because ks.cfg syntax differs between RHEL 8.x and 9.x
+: "${MAJOROSVERSION:=9}" # Default if not defined
+
 ############################
 ## ISO Creation Variables ##
 ############################
@@ -50,7 +61,7 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 : "${ISORESULTDIR:=$OUTPUTDIR/iso}" # Default if not defined
 
 # OEM Source Media File Name
-: "${OEMSRCISO:=CentOS-Stream-9-latest-x86_64-dvd1.iso}" # Default if not defined
+: "${OEMSRCISO:=rhel-9.2-x86_64-dvd.iso}" # Default if not defined
 
 # New ISO file prefix
 : "${NEWISONAMEPREFIX:=Random_Creds-}" # Default if not defined
@@ -228,6 +239,18 @@ if [ "$CREATEBOOTISO" = "true" ]; then
 fi 
 
 echo "$0: Required files and directory checks passed."
+
+### Set required variables for ISO creation and ensure major OS type and 
+### major OS version number matches the OEM ISO file
+
+if [ "$CREATEBOOTISO" = "true" ]; then
+  # Capture output from blkid and load into variables. ($LABEL is what we need for mkisofs below.)
+  # ISO Volume Name must match or boot will fail
+  eval "$(blkid -o export "$ISOSRCDIR"/"$OEMSRCISO")"
+  OSTYPE=$(echo "$LABEL" | grep -oP '^(.*?)(?=\-)')
+  MAJOROSVERSION=$(echo "$LABEL" | grep -o '[0-9]' | head -n 1)
+  echo "$0: Source ISO OS is $OSTYPE $MAJOROSVERSION.x."
+fi
 
 ### Check for required packages
 
@@ -614,10 +637,6 @@ chmod 000 /crypto_keyfile.bin
 EOF
 
 if [ "$CREATEBOOTISO" = "true" ]; then
-  # Capture output from blkid and load into variables. ($LABEL is what we need for mkisofs below.)
-  # ISO Volume Name must match or boot will fail
-  eval "$(blkid -o export "$ISOSRCDIR"/"$OEMSRCISO")"
-
   # Mount OEM Install Media ISO
   mount -o ro "$ISOSRCDIR"/"$OEMSRCISO" "$ISOTMPMNT"
 
