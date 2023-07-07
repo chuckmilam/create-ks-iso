@@ -249,7 +249,7 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   eval "$(blkid -o export "$ISOSRCDIR"/"$OEMSRCISO")"
   OSTYPE=$(echo "$LABEL" | grep -oP '^(.*?)(?=\-)')
   MAJOROSVERSION=$(echo "$LABEL" | grep -o '[0-9]' | head -n 1)
-  echo "$0: Source ISO OS is $OSTYPE $MAJOROSVERSION.x."
+  echo "$0: Source ISO OS is: $OSTYPE $MAJOROSVERSION.x."
 fi
 
 ### Check for required packages
