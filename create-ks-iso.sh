@@ -247,8 +247,8 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   # Capture output from blkid and load into variables. ($LABEL is what we need for mkisofs below.)
   # ISO Volume Name must match or boot will fail
   eval "$(blkid -o export "$ISOSRCDIR"/"$OEMSRCISO")"
-  OSTYPE=$(echo "$LABEL" | grep -oP '^(.*?)(?=\-)')
-  MAJOROSVERSION=$(echo "$LABEL" | grep -o '[0-9]' | head -n 1)
+  OSTYPE=$(echo "$LABEL" | grep -oP '^(.*?)(?=\-)') # Match first text field, "-" as delimiter
+  MAJOROSVERSION=$(echo "$LABEL" | grep -oP '[0-9]{1,2}(?=\-)') # Match only first 1 or 2 digits
   echo "$0: Source ISO OS is: $OSTYPE $MAJOROSVERSION.x."
 fi
 
