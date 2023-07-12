@@ -212,8 +212,8 @@ if [ -n "$IPADDR" ]; then
   network_config+=" --ip=$IPADDR"
   if [ -z ${NETMASK+x} ]; 
     then
-    echo "$0: When using static IP, kickstart requires netmask be defined. Exiting."
-    exit 1
+    echo "$0: When using static IP, netmask must be defined. Exiting."
+    exit 1 
   else
     network_config+=" --netmask=$NETMASK"
   fi
