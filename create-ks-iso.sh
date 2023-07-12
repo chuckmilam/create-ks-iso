@@ -141,10 +141,10 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 : "${TIMEZONE:=America/Chicago}" # Default if not defined
 # System assumes the hardware clock is set to UTC (Greenwich Mean) time
 : "${HWCLOCKUTC:=true}"
-# NTP servers as they should show in the ks.cfg file
-: "${NTP_SERVERS:=0.us.pool.ntp.org,1.us.pool.ntp.org,2.us.pool.ntp.org,3.us.pool.ntp.org}"
-# This is either --utc for system hwclock set to utc, or empty for not.
-: "${UTCSWITCH:=--utc}"
+# NTP servers will be used
+: "${USENTP:=true}" # Default if not defined
+# NTP servers
+: "${NTP_SERVERS:=0.us.pool.ntp.org 1.us.pool.ntp.org 2.us.pool.ntp.org 3.us.pool.ntp.org}"
 
 ########################
 # Function Definitions #
@@ -174,6 +174,20 @@ check_dependency () {
       echo "$1 is a required dependency and was not found. Exiting."
       exit 1
   fi
+}
+
+csv_format_options () {
+  IFS=" " read -r -a CSV_ARRAY <<< "$1" # Safer method for exapanding var in array
+  # Initialize empty string
+  csv_output=""
+  # Iterate over each element in the array
+  for element in "${CSV_ARRAY[@]}"
+  do
+      # Append the element to the csv_output string
+      csv_output+="$element,"
+  done
+  # Remove trailing comma
+  csv_output=${csv_output%,}
 }
 
 ### Check for required permissions
@@ -448,9 +462,6 @@ lang en_US.UTF-8
 # Defaults to enforcing, which is required by STIG
 selinux --enforcing
 
-# Set the system time zone (required)
-timezone $TIMEZONE $UTCSWITCH --ntpservers=$NTP_SERVERS
-
 # Partition clearing information (optional)
 # Initialize invalid partition tables, destroy disk contents with invalid partition tables.
 # Required for EFI booting systems when using cmdline option, above. (optional)
@@ -505,12 +516,6 @@ logvol swap  --$LOGVOLSIZESWAP --fstype='swap' --name=swap --vgname=vg00
 %addon com_redhat_kdump --disable
 %end
 
-# Apply STIG Settings with OpenSCAP
-# %addon com_redhat_oscap
-# content-type = scap-security-guide
-# profile = xccdf_org.ssgproject.content_profile_stig
-# %end
-
 %packages
 # Specify an entire environment to be installed as a line starting with the @^ symbols.
 # Note: Only a single environment should be specified in the Kickstart file. 
@@ -540,6 +545,111 @@ python3
 %end
 
 EOF
+
+### Begin RHEL Version-Specific Sections
+
+# RHEL 8 and 9 both use "timezone," but with different switches
+echo "# Set the system time zone (required)" >> "$SRCDIR"/ks.cfg
+
+case $USENTP in
+  true)
+    case $MAJOROSVERSION in
+      8)
+        csv_format_options "$NTP_SERVERS"
+        case $HWCLOCKUTC in
+          true)
+            echo "timezone $TIMEZONE --utc --ntpservers=$csv_output" >> "$SRCDIR"/ks.cfg
+            ;;
+          *)
+            echo "timezone $TIMEZONE --ntpservers=$csv_output" >> "$SRCDIR"/ks.cfg
+            ;;
+          esac
+          ;;
+       9)
+        case $HWCLOCKUTC in
+          true)
+            echo "timezone $TIMEZONE --utc" >> "$SRCDIR"/ks.cfg
+            ;;
+          *)
+            echo "timezone $TIMEZONE" >> "$SRCDIR"/ks.cfg
+            ;;
+        esac
+        IFS=" " read -r -a NTP_ARRAY <<< "$NTP_SERVERS" # Safer method for exapanding var in array
+        for element in "${NTP_ARRAY[@]}"
+        do
+          echo "timesource --ntp-server $element" >> "$SRCDIR"/ks.cfg
+          done
+          ;;
+    esac
+    ;;
+  *) # Not using NTP
+    case $MAJOROSVERSION in
+      8)
+      case $HWCLOCKUTC in
+        true)
+          echo "timezone --utc --nontp $TIMEZONE" >> "$SRCDIR"/ks.cfg
+          ;;
+        *)
+          echo "timezone --nontp $TIMEZONE" >> "$SRCDIR"/ks.cfg
+        ;;
+      esac
+      ;;
+      9)
+      case $HWCLOCKUTC in
+        true)
+          echo "timezone --utc $TIMEZONE" >> "$SRCDIR"/ks.cfg
+          echo "timesource --ntp-disable" >> "$SRCDIR"/ks.cfg
+          ;;
+        *)
+        echo "timezone $TIMEZONE" >> "$SRCDIR"/ks.cfg
+        echo "timesource --ntp-disable" >> "$SRCDIR"/ks.cfg
+        ;;
+      esac
+      ;;
+    esac
+     ;; 
+esac
+printf "\n" >> "$SRCDIR"/ks.cfg # Whitespace after timezone regardless of options
+
+# Each OpenSCAP addon section is slightly different depending on OSTYPE and MAJORVERSION
+if [ "$APPLYOPENSCAPSTIG" = "TRUE" ]; then
+  case $OSTYPE in 
+    RHEL)
+      echo -e "$0: OpenSCAP DISA STIG settings for $OSTYPE $MAJOROSVERSION will be applied"
+      echo "# Apply STIG Settings with OpenSCAP" >> "$SRCDIR"/ks.cfg
+      case $MAJOROSVERSION in
+        8)
+          echo "%addon org_fedora_oscap"                              >> "$SRCDIR"/ks.cfg
+        ;;
+        9)
+          echo "%addon org_redhat_oscap"                              >> "$SRCDIR"/ks.cfg
+        ;;
+        esac
+      echo "content-type = scap-security-guide"                         >> "$SRCDIR"/ks.cfg
+      echo "profile = xccdf_org.ssgproject.content_profile_stig"        >> "$SRCDIR"/ks.cfg
+      echo "%end"  >> "$SRCDIR"/ks.cfg
+      printf "\n" >> "$SRCDIR"/ks.cfg
+    ;;
+    CentOS)
+      echo -e "$0: DISA does NOT provide a STIG for CentOS. Proceed with caution!"
+      echo -e "$0: OpenSCAP DISA STIG settings for nearest RHEL version to $OSTYPE $MAJOROSVERSION will be attempted."
+      echo "# Apply STIG Settings with OpenSCAP" >> "$SRCDIR"/ks.cfg
+      echo "# NOTE: DISA does NOT provide an official STIG for CentOS. Proceed with caution!" >> "$SRCDIR"/ks.cfg
+      case $MAJOROSVERSION in
+        8)
+          echo "%addon org_fedora_oscap"                              >> "$SRCDIR"/ks.cfg
+        ;;
+        9)
+          echo "%addon org_redhat_oscap"                              >> "$SRCDIR"/ks.cfg
+        ;;
+        esac
+      echo "content-type = scap-security-guide"                         >> "$SRCDIR"/ks.cfg
+      echo "profile = xccdf_org.ssgproject.content_profile_stig"        >> "$SRCDIR"/ks.cfg
+      echo "%end"  >> "$SRCDIR"/ks.cfg
+      printf "\n" >> "$SRCDIR"/ks.cfg
+    ;;
+  esac  
+fi
 
 ## Bootloader section
 cat << EOF >> "$SRCDIR"/ks.cfg
