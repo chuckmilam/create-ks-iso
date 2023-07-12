@@ -177,7 +177,7 @@ check_dependency () {
 }
 
 csv_format_options () {
-  CSV_ARRAY=($1) # Do not quote this variable name
+  IFS=" " read -r -a CSV_ARRAY <<< "$1" # Safer method for exapanding var in array
   # Initialize empty string
   csv_output=""
   # Iterate over each element in the array
@@ -574,7 +574,6 @@ case $USENTP in
             echo "timezone $TIMEZONE" >> "$SRCDIR"/ks.cfg
             ;;
           esac
-        
           ;;
     esac
     ;;
