@@ -573,19 +573,40 @@ case $USENTP in
           *)
             echo "timezone $TIMEZONE" >> "$SRCDIR"/ks.cfg
             ;;
-          esac
+        esac
+        IFS=" " read -r -a NTP_ARRAY <<< "$NTP_SERVERS" # Safer method for exapanding var in array
+        for element in "${NTP_ARRAY[@]}"
+        do
+          echo "timesource --ntp-server $element" >> "$SRCDIR"/ks.cfg
+          done
           ;;
     esac
     ;;
   *) # Not using NTP
-    case $HWCLOCKUTC in
-      true)
-        echo "timezone --utc --nontp $TIMEZONE" >> "$SRCDIR"/ks.cfg
+    case $MAJOROSVERSION in
+      8)
+      case $HWCLOCKUTC in
+        true)
+          echo "timezone --utc --nontp $TIMEZONE" >> "$SRCDIR"/ks.cfg
+          ;;
+        *)
+          echo "timezone --nontp $TIMEZONE" >> "$SRCDIR"/ks.cfg
         ;;
-      *)
-        echo "timezone --nontp $TIMEZONE" >> "$SRCDIR"/ks.cfg
+      esac
       ;;
-     esac
+      9)
+      case $HWCLOCKUTC in
+        true)
+          echo "timezone --utc $TIMEZONE" >> "$SRCDIR"/ks.cfg
+          echo "timesource --ntp-disable" >> "$SRCDIR"/ks.cfg
+          ;;
+        *)
+        echo "timezone $TIMEZONE" >> "$SRCDIR"/ks.cfg
+        echo "timesource --ntp-disable" >> "$SRCDIR"/ks.cfg
+        ;;
+      esac
+      ;;
+    esac
      ;; 
 esac
 printf "\n" >> "$SRCDIR"/ks.cfg # Whitespace after timezone regardless of options
