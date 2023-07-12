@@ -146,6 +146,11 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 # NTP servers
 : "${NTP_SERVERS:=0.us.pool.ntp.org 1.us.pool.ntp.org 2.us.pool.ntp.org 3.us.pool.ntp.org}"
 
+## Network Configuration Settings 
+: "${NETWORK_ONBOOT:=true}" # Default if not defined
+# Do not use IPV6 unless specifically requested
+: "${USEIPV6:=false}" # Default if not defined
+
 ########################
 # Function Definitions #
 ########################
@@ -189,6 +194,45 @@ csv_format_options () {
   # Remove trailing comma
   csv_output=${csv_output%,}
 }
+
+## Network Configuration Logic
+network_config="network" # Start of network configuration line in ks.cfg
+# Add options as defined by variables
+
+# Enable network on boot
+case $NETWORK_ONBOOT
+  in true)
+    network_config+=" --onboot yes"
+    ;;
+esac  
+
+# Static IP or DHCP 
+if [ -n "$IPADDR" ]; then
+  network_config+=" --bootproto static"
+  network_config+=" --ip=$IPADDR"
+  if [ -z ${NETMASK+x} ]; 
+    then
+    echo "$0: When using static IP, kickstart requires netmask be defined. Exiting."
+    exit 1
+  else
+    network_config+=" --netmask=$NETMASK"
+  fi
+  if [ -n "$GATEWAY" ]; then
+    network_config+=" --gateway=$GATEWAY"
+  fi
+  if [ -n "$DNS_SERVERS" ]; then
+  # Get DNS servers into CSV format
+  csv_format_options "$DNS_SERVERS"
+  network_config+=" --nameserver=$csv_output"
+  fi
+else
+network_config+=" --bootproto dhcp"
+  case $USEIPV6
+    in false)
+      network_config+=" --noipv6"
+      ;;
+  esac
+fi
 
 ### Check for required permissions
 
@@ -437,8 +481,7 @@ cmdline
 # --noipv6      disable IPv6 on this device
 #
 # To use static IP configuration, "--bootproto=static" must be used. For example:
-# network --bootproto=static --ip=10.0.2.15 --netmask=255.255.255.0 --gateway=10.0.2.254 --nameserver 192.168.2.1,192.168.3.1
-network --onboot yes --bootproto dhcp --noipv6
+$network_config
 
 # Initial Setup application starts the first time the system is booted. (optional)
 #   If enabled, the initial-setup package must be installed in packages section.
