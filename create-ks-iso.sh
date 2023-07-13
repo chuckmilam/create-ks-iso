@@ -151,6 +151,10 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 # Do not use IPV6 unless specifically requested
 : "${USEIPV6:=false}" # Default if not defined
 
+## Installer Behavior Options
+# Disable interactive installer prompts
+: "${FIRSTBOOT:=false}" # Default if not defined
+
 ########################
 # Function Definitions #
 ########################
@@ -496,9 +500,8 @@ cat <<EOF > "$SRCDIR"/ks.cfg
 #   accomplished with Ansible or similar tools.
 #  
 # Assumptions: 
-#   1. PXE boot is NOT an option, requiring use of the ISOs.
-#   2. Support infrastucture such as clevis/tang systems are not available.
-#   3. System will be a physical or VM system.
+#   1. Support infrastucture such as clevis/tang systems are not available.
+#   2. System will be a physical or VM system.
 #
 # Note:
 #   Parentheticals such as: "(optional), (required)" refer to 
@@ -510,15 +513,21 @@ cat <<EOF > "$SRCDIR"/ks.cfg
 cdrom
 
 # Install method (optional) 
-#   Choices here are: graphical (Full GUI), text (TUI), or cmdline (non-interactive)
-#   Use "text" below in order to be prompted for LUKS disk encryption passphrase during install
 cmdline
 
+EOF
+
+if [ "$FIRSTBOOT" = "true" ]; then
+cat <<EOF >> "$SRCDIR"/ks.cfg
 # Initial Setup application starts the first time the system is booted. (optional)
 #   If enabled, the initial-setup package must be installed in packages section.
 #   This allows for network setup prompts at console, which requires interative user input.
-# firstboot --enabled
+firstboot --enabled
 
+EOF
+fi
+
+cat <<EOF >> "$SRCDIR"/ks.cfg
 # Agree to EULA (required)
 eula --agreed
 
