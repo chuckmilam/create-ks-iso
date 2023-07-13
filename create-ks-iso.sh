@@ -669,7 +669,7 @@ esac
 printf "\n" >> "$SRCDIR"/ks.cfg # Whitespace after timezone regardless of options
 
 # Each OpenSCAP addon section is slightly different depending on OSTYPE and MAJORVERSION
-if [ "$APPLYOPENSCAPSTIG" = "TRUE" ]; then
+if [ "$APPLYOPENSCAPSTIG" = "true" ]; then
   case $OSTYPE in 
     RHEL)
       echo -e "$0: OpenSCAP DISA STIG settings for $OSTYPE $MAJOROSVERSION will be applied"
