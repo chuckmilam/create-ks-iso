@@ -248,6 +248,33 @@ network_config+=" --bootproto dhcp"
   esac
 fi
 
+## timezone kickstart command logic
+# RHEL 8 and 9 both use the "timezone" command, but with different options
+# Start of timezone configuration line in ks.cfg
+timezone_config="timezone $TIMEZONE"
+
+if [ "$HWCLOCKUTC" = "true" ]; then
+  timezone_config+=" --utc"
+fi
+
+if [ "$USENTP" = "true" ]; then
+    case $MAJOROSVERSION in
+      8)
+        csv_format_options "$NTP_SERVERS"
+        timezone_config+=" --ntpservers=$csv_output"
+        ;;
+      9)
+        IFS=" " read -r -a NTP_ARRAY <<< "$NTP_SERVERS" # Safer method for exapanding var in array
+          prefix="timesource  --ntp-server "
+          for ((i=0; i<${#NTP_ARRAY[@]}; i++)); do
+            NTP_ARRAY[i]=$prefix${NTP_ARRAY[$i]}
+          done
+        ;;
+      esac
+else
+  timezone_config+=" --nontp"
+fi
+
 ### Check for required permissions
 
 if [ "$CREATEBOOTISO" = "true" ]; then
@@ -447,7 +474,7 @@ LUKSDEV="/dev/sda3"
 
 ### Write out header and append required lines to kickstart file
 
-cat << EOF > "$SRCDIR"/ks.cfg
+cat <<EOF > "$SRCDIR"/ks.cfg
 #################################################
 #  Basic Kickstart for STIG-Compliant Installs  #
 #################################################
@@ -487,16 +514,6 @@ cdrom
 #   Use "text" below in order to be prompted for LUKS disk encryption passphrase during install
 cmdline
 
-# Configure network information for target system and activate network devices 
-# in the installer environment (optional)
-# --onboot      enable device at a boot time
-# --device      device to be activated and / or configured with the network command
-# --bootproto   method to obtain networking configuration for device (default dhcp)
-# --noipv6      disable IPv6 on this device
-#
-# To use static IP configuration, "--bootproto=static" must be used. For example:
-$network_config
-
 # Initial Setup application starts the first time the system is booted. (optional)
 #   If enabled, the initial-setup package must be installed in packages section.
 #   This allows for network setup prompts at console, which requires interative user input.
@@ -519,6 +536,28 @@ lang en_US.UTF-8
 # Defaults to enforcing, which is required by STIG
 selinux --enforcing
 
+# Configure network information for target system and activate network devices 
+# in the installer environment (optional)
+$network_config
+
+# Set the system time zone (required)
+$timezone_config
+EOF
+
+if [[ "$MAJOROSVERSION" -ge "9" ]] && [[ "$USENTP" = "true" ]]; then
+  # Print array values one line at a time
+  echo "# NTP Servers " >> "$SRCDIR"/ks.cfg
+  for element in "${NTP_ARRAY[@]}"; do
+    echo "$element" >> "$SRCDIR"/ks.cfg
+  done
+fi
+
+cat <<EOF >> "$SRCDIR"/ks.cfg
+
+##
+##  Begin disk partition information
+##
+
 # Partition clearing information (optional)
 # Initialize invalid partition tables, destroy disk contents with invalid partition tables.
 # Required for EFI booting systems when using cmdline option, above. (optional)
@@ -527,10 +566,6 @@ zerombr
 # CAUTION: The --all switch by itself will clear ALL partitions on ALL drives, 
 #          including network storage. Use with caution in mixed environments.
 clearpart --initlabel --all
-
-##
-##  Begin disk partition information
-##
 
 # Ensure only sda is used for kickstart (optional)
 # Without this, /boot ends up on disk 1 (usually sda), and 
@@ -603,71 +638,6 @@ python3
 
 EOF
 
-### Begin RHEL Version-Specific Sections
-
-# RHEL 8 and 9 both use "timezone," but with different switches
-echo "# Set the system time zone (required)" >> "$SRCDIR"/ks.cfg
-
-case $USENTP in
-  true)
-    case $MAJOROSVERSION in
-      8)
-        csv_format_options "$NTP_SERVERS"
-        case $HWCLOCKUTC in
-          true)
-            echo "timezone $TIMEZONE --utc --ntpservers=$csv_output" >> "$SRCDIR"/ks.cfg
-            ;;
-          *)
-            echo "timezone $TIMEZONE --ntpservers=$csv_output" >> "$SRCDIR"/ks.cfg
-            ;;
-          esac
-          ;;
-       9)
-        case $HWCLOCKUTC in
-          true)
-            echo "timezone $TIMEZONE --utc" >> "$SRCDIR"/ks.cfg
-            ;;
-          *)
-            echo "timezone $TIMEZONE" >> "$SRCDIR"/ks.cfg
-            ;;
-        esac
-        IFS=" " read -r -a NTP_ARRAY <<< "$NTP_SERVERS" # Safer method for exapanding var in array
-        for element in "${NTP_ARRAY[@]}"
-        do
-          echo "timesource --ntp-server $element" >> "$SRCDIR"/ks.cfg
-          done
-          ;;
-    esac
-    ;;
-  *) # Not using NTP
-    case $MAJOROSVERSION in
-      8)
-      case $HWCLOCKUTC in
-        true)
-          echo "timezone --utc --nontp $TIMEZONE" >> "$SRCDIR"/ks.cfg
-          ;;
-        *)
-          echo "timezone --nontp $TIMEZONE" >> "$SRCDIR"/ks.cfg
-        ;;
-      esac
-      ;;
-      9)
-      case $HWCLOCKUTC in
-        true)
-          echo "timezone --utc $TIMEZONE" >> "$SRCDIR"/ks.cfg
-          echo "timesource --ntp-disable" >> "$SRCDIR"/ks.cfg
-          ;;
-        *)
-        echo "timezone $TIMEZONE" >> "$SRCDIR"/ks.cfg
-        echo "timesource --ntp-disable" >> "$SRCDIR"/ks.cfg
-        ;;
-      esac
-      ;;
-    esac
-     ;; 
-esac
-printf "\n" >> "$SRCDIR"/ks.cfg # Whitespace after timezone regardless of options
-
 # Each OpenSCAP addon section is slightly different depending on OSTYPE and MAJORVERSION
 if [ "$APPLYOPENSCAPSTIG" = "true" ]; then
   case $OSTYPE in 
@@ -709,26 +679,26 @@ if [ "$APPLYOPENSCAPSTIG" = "true" ]; then
 fi
 
 ## Bootloader section
-cat << EOF >> "$SRCDIR"/ks.cfg
+cat <<EOF >> "$SRCDIR"/ks.cfg
 # Specify how the bootloader should be installed (required)
 # This password hash must be generated by: grub2-mkpasswd-pbkdf2
 EOF
 
 case $ENABLEFIPS in
   true)
-cat << EOF >> "$SRCDIR"/ks.cfg
+cat <<EOF >> "$SRCDIR"/ks.cfg
 bootloader --append "fips=1" --iscrypted --password=$grub2_encrypted_passwd
 
 EOF
   ;;
 *)
-cat << EOF >> "$SRCDIR"/ks.cfg
+cat <<EOF >> "$SRCDIR"/ks.cfg
 bootloader --iscrypted --password=$grub2_encrypted_passwd
 
 EOF
 esac
 
-cat << EOF >> "$SRCDIR"/ks.cfg
+cat <<EOF >> "$SRCDIR"/ks.cfg
 ### Randomly-Generated Cred Section
 
 # Set the system's root password (required)
