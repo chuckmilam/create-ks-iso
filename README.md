@@ -124,22 +124,23 @@ The `fedora:latest` image is used instead of the Red Hat UBI because `genisoimag
 ## Roadmap
 Things to implement/improve:
 - [x] Replace soon-to-be-deprecated python `crypt` module in `encrypt_random_passwd` function.
-- [ ] Make configurable as variables in ks.cfg:
+- [x] Make configurable as variables in ks.cfg:
     - [x] Disk partition sizes
-    - [ ] NTP configuration
-    - [ ] Network settings
+    - [x] NTP configuration
+    - [x] Network settings
 - [x] DOCKERFILE for portability and network functionality
     - [ ] Find a RHEL base image that has the needed packages available
     - [ ] Investigate use of Docker .env file instead of CONFIG_FILE
     - [ ] Docker configuration for network kickstart delivery
 - [ ] Complete CONFIG_FILE template with available variables
-- [ ] STIG oscap/anaconda plugin logic based on OS distribution and version
+- [x] STIG oscap/anaconda plugin logic based on OS distribution and version
 - [x] Checks for required packages for ISO creation
 - [ ] ksvalidator checks
-- [ ] Change ntpserver kickstart statement per major OS version (8.x vs 9.x)
+- [x] Change ntpserver kickstart statement per major OS version (8.x vs 9.x)
 - [ ] Utilize "light" installer ISO for network-based installs
 - [x] Option to create FIPS-enabled boot ISO without baked-in kickstart file
 - [ ] Option to specify a different kickstart location (HTTP/S, NFS, etc.)
+- [ ] Option to write generated SSH keys and passwords into ISO
 - [x] Warning if setting FIPS mode without creating boot ISO
 
 ## History
