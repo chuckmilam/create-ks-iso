@@ -202,10 +202,10 @@ network_config="network"
 # Add options as defined by variables
 
 if [ -n "$HOSTNAME" ]; then
-  # Check hostname is not greater than 64 characters
   # Get only hostname portion if using a FQDN
   short_hostname=${HOSTNAME%%"."*}
   hostname_length=${#short_hostname}
+  # Check hostname is not greater than 64 characters
   if [ "$hostname_length" -gt '64' ]; then
     echo "$0: kickstart limitation: Hostname cannot exceed 64 characters. Exiting."
     exit 1 
