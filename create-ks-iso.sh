@@ -206,7 +206,7 @@ if [ -n "$HOSTNAME" ]; then
   # Get only hostname portion if using a FQDN
   short_hostname=${HOSTNAME%%"."*}
   hostname_length=${#short_hostname}
-  if [ $hostname_length -gt '64' ]; then
+  if [ "$hostname_length" -gt '64' ]; then
     echo "$0: kickstart limitation: Hostname cannot exceed 64 characters. Exiting."
     exit 1 
   fi
