@@ -196,8 +196,22 @@ csv_format_options () {
 }
 
 ## Network Configuration Logic
-network_config="network" # Start of network configuration line in ks.cfg
+
+# Start of network configuration line in ks.cfg
+network_config="network" 
 # Add options as defined by variables
+
+if [ -n "$HOSTNAME" ]; then
+  # Check hostname is not greater than 64 characters
+  # Get only hostname portion if using a FQDN
+  short_hostname=${HOSTNAME%%"."*}
+  hostname_length=${#short_hostname}
+  if [ $hostname_length -gt '64' ]; then
+    echo "$0: kickstart limitation: Hostname cannot exceed 64 characters. Exiting."
+    exit 1 
+  fi
+  network_config+=" --hostname $HOSTNAME"
+fi
 
 # Enable network on boot
 case $NETWORK_ONBOOT
@@ -206,7 +220,7 @@ case $NETWORK_ONBOOT
     ;;
 esac  
 
-# Static IP or DHCP 
+# Static IP or DHCP
 if [ -n "$IPADDR" ]; then
   network_config+=" --bootproto static"
   network_config+=" --ip=$IPADDR"
