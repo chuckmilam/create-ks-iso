@@ -18,7 +18,7 @@ echo -e "$0: Starting at $(date)"
 : "${OSTYPE:=RHEL}" # Default if not defined
 
 # Major OS Version number
-# We need this because ks.cfg syntax differs between RHEL 8.x and 9.x
+# ks.cfg command syntax varies between RHEL 8.x and 9.x
 : "${MAJOROSVERSION:=9}" # Default if not defined
 
 ############################
@@ -144,12 +144,16 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 # NTP servers will be used
 : "${USENTP:=true}" # Default if not defined
 # NTP servers
-: "${NTP_SERVERS:=0.us.pool.ntp.org 1.us.pool.ntp.org 2.us.pool.ntp.org 3.us.pool.ntp.org}"
+: "${NTP_SERVERS:=0.us.pool.ntp.org 1.us.pool.ntp.org 2.us.pool.ntp.org 3.us.pool.ntp.org}" # Default if not defined
 
 ## Network Configuration Settings 
 : "${NETWORK_ONBOOT:=true}" # Default if not defined
 # Do not use IPV6 unless specifically requested
 : "${USEIPV6:=false}" # Default if not defined
+
+## Installer Behavior Options
+# Disable interactive installer prompts
+: "${FIRSTBOOT:=false}" # Default if not defined
 
 ########################
 # Function Definitions #
@@ -194,6 +198,29 @@ csv_format_options () {
   # Remove trailing comma
   csv_output=${csv_output%,}
 }
+
+### Set required variables for ISO creation
+## Ensure major OS type and major OS version number matches OEM ISO file
+if [[ "$CREATEBOOTISO" = "true" || -n "$OEMSRCISO" ]]; then
+  # Capture output from blkid and load into variables. ($LABEL needed for mkisofs later.)
+  # ISO Volume Name must match or boot will fail
+  eval "$(blkid -o export "$ISOSRCDIR"/"$OEMSRCISO")"
+  OSTYPE=$(echo "$LABEL" | grep -oP '^(.*?)(?=\-)') # Match first text field, "-" as delimiter
+  MAJOROSVERSION=$(echo "$LABEL" | grep -oP '(\d{1,2})' | head -n 1) # Match only first 1 or 2 digits, return only first result
+  echo "$0: Source ISO OS is $OSTYPE $MAJOROSVERSION."
+  if [ "$DEBUG" = "true" ]; then
+    echo "$0: ===================================================="
+    echo "$0: DEBUG: Values from blkid of $ISOSRCDIR"/"$OEMSRCISO:"
+    echo "$0: DEBUG: DEVNAME=$DEVNAME"
+    echo "$0: DEBUG: BLOCK_SIZE=$BLOCK_SIZE"
+    echo "$0: DEBUG: UUID=$UUID"
+    echo "$0: DEBUG: LABEL=$LABEL"
+    echo "$0: DEBUG: TYPE=$TYPE"
+    echo "$0: DEBUG: PTUUID=$PTUUID"
+    echo "$0: DEBUG: PTTYPE=$PTTYPE"
+    echo "$0: ===================================================="
+  fi
+fi
 
 ## Network Configuration Logic
 
@@ -246,6 +273,33 @@ network_config+=" --bootproto dhcp"
       network_config+=" --noipv6"
       ;;
   esac
+fi
+
+## timezone kickstart command logic
+# RHEL 8 and 9 both use the "timezone" command, but with different options
+# Start of timezone configuration line in ks.cfg
+timezone_config="timezone $TIMEZONE"
+
+if [ "$HWCLOCKUTC" = "true" ]; then
+  timezone_config+=" --utc"
+fi
+
+if [ "$USENTP" = "true" ]; then
+    case $MAJOROSVERSION in
+      8)
+        csv_format_options "$NTP_SERVERS"
+        timezone_config+=" --ntpservers=$csv_output"
+        ;;
+      9)
+        IFS=" " read -r -a NTP_ARRAY <<< "$NTP_SERVERS" # Safer method for exapanding var in array
+          prefix="timesource  --ntp-server "
+          for ((i=0; i<${#NTP_ARRAY[@]}; i++)); do
+            NTP_ARRAY[i]=$prefix${NTP_ARRAY[$i]}
+          done
+        ;;
+      esac
+else
+  timezone_config+=" --nontp"
 fi
 
 ### Check for required permissions
@@ -311,18 +365,6 @@ if [ "$CREATEBOOTISO" = "true" ]; then
 fi 
 
 echo "$0: Required files and directory checks passed."
-
-### Set required variables for ISO creation and ensure major OS type and 
-### major OS version number matches the OEM ISO file
-
-if [ "$CREATEBOOTISO" = "true" ]; then
-  # Capture output from blkid and load into variables. ($LABEL is what we need for mkisofs below.)
-  # ISO Volume Name must match or boot will fail
-  eval "$(blkid -o export "$ISOSRCDIR"/"$OEMSRCISO")"
-  OSTYPE=$(echo "$LABEL" | grep -oP '^(.*?)(?=\-)') # Match first text field, "-" as delimiter
-  MAJOROSVERSION=$(echo "$LABEL" | grep -oP '(\d{1,2})' | head -n 1) # Match only first 1 or 2 digits, return only first result
-  echo -e "$0: Source ISO OS is $OSTYPE $MAJOROSVERSION."
-fi
 
 ### Check for required packages
 
@@ -447,7 +489,7 @@ LUKSDEV="/dev/sda3"
 
 ### Write out header and append required lines to kickstart file
 
-cat << EOF > "$SRCDIR"/ks.cfg
+cat <<EOF > "$SRCDIR"/ks.cfg
 #################################################
 #  Basic Kickstart for STIG-Compliant Installs  #
 #################################################
@@ -469,39 +511,36 @@ cat << EOF > "$SRCDIR"/ks.cfg
 #   accomplished with Ansible or similar tools.
 #  
 # Assumptions: 
-#   1. PXE boot is NOT an option, requiring use of the ISOs.
-#   2. Support infrastucture such as clevis/tang systems are not available.
-#   3. System will be a physical or VM system.
+#   1. Support infrastucture such as clevis/tang systems are not available.
+#   2. System will be a physical or VM system.
 #
 # Note:
 #   Parentheticals such as: "(optional), (required)" refer to 
 #   kickstart configuration requirements
 
+## Begin kickstart config:
+
 # Perform installation from the first optical drive on the system. (optional)
 #   Use CDROM installation media, NOTE: This requires the full install DVD ISO. 
-#   The boot iso is only for pointing to a remote install repository.
+#   The netboot iso is only for pointing to a remote install repository.
 cdrom
 
 # Install method (optional) 
-#   Choices here are: graphical (Full GUI), text (TUI), or cmdline (non-interactive)
-#   Use "text" below in order to be prompted for LUKS disk encryption passphrase during install
 cmdline
 
-# Configure network information for target system and activate network devices 
-# in the installer environment (optional)
-# --onboot      enable device at a boot time
-# --device      device to be activated and / or configured with the network command
-# --bootproto   method to obtain networking configuration for device (default dhcp)
-# --noipv6      disable IPv6 on this device
-#
-# To use static IP configuration, "--bootproto=static" must be used. For example:
-$network_config
+EOF
 
+if [ "$FIRSTBOOT" = "true" ]; then
+cat <<EOF >> "$SRCDIR"/ks.cfg
 # Initial Setup application starts the first time the system is booted. (optional)
 #   If enabled, the initial-setup package must be installed in packages section.
 #   This allows for network setup prompts at console, which requires interative user input.
-# firstboot --enabled
+firstboot --enabled
 
+EOF
+fi
+
+cat <<EOF >> "$SRCDIR"/ks.cfg
 # Agree to EULA (required)
 eula --agreed
 
@@ -519,6 +558,28 @@ lang en_US.UTF-8
 # Defaults to enforcing, which is required by STIG
 selinux --enforcing
 
+# Configure network information for target system and activate network devices 
+# in the installer environment (optional)
+$network_config
+
+# Set the system time zone (required)
+$timezone_config
+EOF
+
+if [[ "$MAJOROSVERSION" -ge "9" ]] && [[ "$USENTP" = "true" ]]; then
+  # Print array values one line at a time
+  echo "# NTP Servers " >> "$SRCDIR"/ks.cfg
+  for element in "${NTP_ARRAY[@]}"; do
+    echo "$element" >> "$SRCDIR"/ks.cfg
+  done
+fi
+
+cat <<EOF >> "$SRCDIR"/ks.cfg
+
+##
+##  Begin disk partition information
+##
+
 # Partition clearing information (optional)
 # Initialize invalid partition tables, destroy disk contents with invalid partition tables.
 # Required for EFI booting systems when using cmdline option, above. (optional)
@@ -527,10 +588,6 @@ zerombr
 # CAUTION: The --all switch by itself will clear ALL partitions on ALL drives, 
 #          including network storage. Use with caution in mixed environments.
 clearpart --initlabel --all
-
-##
-##  Begin disk partition information
-##
 
 # Ensure only sda is used for kickstart (optional)
 # Without this, /boot ends up on disk 1 (usually sda), and 
@@ -569,104 +626,12 @@ logvol /opt  --fstype='xfs' --size=$LOGVOLSIZEOPT --name=opt --vgname=vg00 --fso
 logvol swap  --$LOGVOLSIZESWAP --fstype='swap' --name=swap --vgname=vg00 
 ## End boot partition information
 
+## Kickstart/anaconda addons
 # STIG Requirement: Disable kdump
 %addon com_redhat_kdump --disable
 %end
 
-%packages
-# Specify an entire environment to be installed as a line starting with the @^ symbols.
-# Note: Only a single environment should be specified in the Kickstart file. 
-# If more environments are specified, only the last specified environment is used.
-# Define a minimal system environment
-@^minimal-environment
-# Initial Setup application starts the first time the system is booted, required
-# when firstboot option is set above. 
-initial-setup
-# STIG-required packages:
-# With STIG oscap profile applied, login will fail unless tmux is installed
-tmux
-# Various package findings are mitigated with the following. Installed here because oscap
-# calls yum to install STIG-required packages, but networking is not yet configured and 
-# Red Hat subscriptions have not yet been registered:
-audispd-plugins
-aide
-dnf-automatic
-libcap-ng-utils
-rsyslog-gnutls
-policycoreutils-python-utils
-chrony
-usbguard
-fapolicyd
-rng-tools
-python3
-%end
-
 EOF
-
-### Begin RHEL Version-Specific Sections
-
-# RHEL 8 and 9 both use "timezone," but with different switches
-echo "# Set the system time zone (required)" >> "$SRCDIR"/ks.cfg
-
-case $USENTP in
-  true)
-    case $MAJOROSVERSION in
-      8)
-        csv_format_options "$NTP_SERVERS"
-        case $HWCLOCKUTC in
-          true)
-            echo "timezone $TIMEZONE --utc --ntpservers=$csv_output" >> "$SRCDIR"/ks.cfg
-            ;;
-          *)
-            echo "timezone $TIMEZONE --ntpservers=$csv_output" >> "$SRCDIR"/ks.cfg
-            ;;
-          esac
-          ;;
-       9)
-        case $HWCLOCKUTC in
-          true)
-            echo "timezone $TIMEZONE --utc" >> "$SRCDIR"/ks.cfg
-            ;;
-          *)
-            echo "timezone $TIMEZONE" >> "$SRCDIR"/ks.cfg
-            ;;
-        esac
-        IFS=" " read -r -a NTP_ARRAY <<< "$NTP_SERVERS" # Safer method for exapanding var in array
-        for element in "${NTP_ARRAY[@]}"
-        do
-          echo "timesource --ntp-server $element" >> "$SRCDIR"/ks.cfg
-          done
-          ;;
-    esac
-    ;;
-  *) # Not using NTP
-    case $MAJOROSVERSION in
-      8)
-      case $HWCLOCKUTC in
-        true)
-          echo "timezone --utc --nontp $TIMEZONE" >> "$SRCDIR"/ks.cfg
-          ;;
-        *)
-          echo "timezone --nontp $TIMEZONE" >> "$SRCDIR"/ks.cfg
-        ;;
-      esac
-      ;;
-      9)
-      case $HWCLOCKUTC in
-        true)
-          echo "timezone --utc $TIMEZONE" >> "$SRCDIR"/ks.cfg
-          echo "timesource --ntp-disable" >> "$SRCDIR"/ks.cfg
-          ;;
-        *)
-        echo "timezone $TIMEZONE" >> "$SRCDIR"/ks.cfg
-        echo "timesource --ntp-disable" >> "$SRCDIR"/ks.cfg
-        ;;
-      esac
-      ;;
-    esac
-     ;; 
-esac
-printf "\n" >> "$SRCDIR"/ks.cfg # Whitespace after timezone regardless of options
 
 # Each OpenSCAP addon section is slightly different depending on OSTYPE and MAJORVERSION
 if [ "$APPLYOPENSCAPSTIG" = "true" ]; then
@@ -676,10 +641,10 @@ if [ "$APPLYOPENSCAPSTIG" = "true" ]; then
       echo "# Apply STIG Settings with OpenSCAP" >> "$SRCDIR"/ks.cfg
       case $MAJOROSVERSION in
         8)
-          echo "%addon org_fedora_oscap"                              >> "$SRCDIR"/ks.cfg
+          echo "%addon org_fedora_oscap" >> "$SRCDIR"/ks.cfg
         ;;
         9)
-          echo "%addon org_redhat_oscap"                              >> "$SRCDIR"/ks.cfg
+          echo "%addon org_redhat_oscap" >> "$SRCDIR"/ks.cfg
         ;;
         esac
       echo "content-type = scap-security-guide"                         >> "$SRCDIR"/ks.cfg
@@ -708,27 +673,57 @@ if [ "$APPLYOPENSCAPSTIG" = "true" ]; then
   esac  
 fi
 
+
+cat <<EOF >> "$SRCDIR"/ks.cfg
+%packages
+# Specify an entire environment to be installed as a line starting with the @^ symbols.
+# Note: Only a single environment should be specified in the Kickstart file. 
+# If more environments are specified, only the last specified environment is used.
+# Define a minimal system environment
+@^minimal-environment
+# Initial Setup application starts the first time the system is booted, required
+# when firstboot option is set above. 
+initial-setup
+# STIG-required packages:
+# With STIG oscap profile applied, login will fail unless tmux is installed
+tmux
+# Various package findings are mitigated with the following. Installed here because oscap
+# calls yum to install STIG-required packages, but networking is not yet configured and 
+# Red Hat subscriptions have not yet been registered:
+audispd-plugins
+aide
+dnf-automatic
+libcap-ng-utils
+rsyslog-gnutls
+policycoreutils-python-utils
+chrony
+usbguard
+fapolicyd
+rng-tools
+python3
+%end
+
 ## Bootloader section
-cat << EOF >> "$SRCDIR"/ks.cfg
+cat <<EOF >> "$SRCDIR"/ks.cfg
 # Specify how the bootloader should be installed (required)
 # This password hash must be generated by: grub2-mkpasswd-pbkdf2
 EOF
 
 case $ENABLEFIPS in
   true)
-cat << EOF >> "$SRCDIR"/ks.cfg
+cat <<EOF >> "$SRCDIR"/ks.cfg
 bootloader --append "fips=1" --iscrypted --password=$grub2_encrypted_passwd
 
 EOF
   ;;
 *)
-cat << EOF >> "$SRCDIR"/ks.cfg
+cat <<EOF >> "$SRCDIR"/ks.cfg
 bootloader --iscrypted --password=$grub2_encrypted_passwd
 
 EOF
 esac
 
-cat << EOF >> "$SRCDIR"/ks.cfg
+cat <<EOF >> "$SRCDIR"/ks.cfg
 ### Randomly-Generated Cred Section
 
 # Set the system's root password (required)
