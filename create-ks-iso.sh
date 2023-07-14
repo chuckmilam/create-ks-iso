@@ -61,7 +61,7 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 : "${ISORESULTDIR:=$OUTPUTDIR/iso}" # Default if not defined
 
 # OEM Source Media File Name
-: "${OEMSRCISO:=rhel-9.2-x86_64-dvd.iso}" # Default if not defined
+#: "${OEMSRCISO:=rhel-9.2-x86_64-dvd.iso}" # Default if not defined
 
 # New ISO file prefix
 : "${NEWISONAMEPREFIX:=Random_Creds-}" # Default if not defined
@@ -207,7 +207,9 @@ if [[ "$CREATEBOOTISO" = "true" || -n "$OEMSRCISO" ]]; then
   eval "$(blkid -o export "$ISOSRCDIR"/"$OEMSRCISO")"
   OSTYPE=$(echo "$LABEL" | grep -oP '^(.*?)(?=\-)') # Match first text field, "-" as delimiter
   MAJOROSVERSION=$(echo "$LABEL" | grep -oP '(\d{1,2})' | head -n 1) # Match only first 1 or 2 digits, return only first result
-  echo "$0: Source ISO OS is $OSTYPE $MAJOROSVERSION."
+  if [ -n "$OEMSRCISO" ]; then
+    echo "$0: Source ISO OS is $OSTYPE $MAJOROSVERSION."
+  fi
   if [ "$DEBUG" = "true" ]; then
     echo "$0: ===================================================="
     echo "$0: DEBUG: Values from blkid of $ISOSRCDIR"/"$OEMSRCISO:"
@@ -285,21 +287,23 @@ if [ "$HWCLOCKUTC" = "true" ]; then
 fi
 
 if [ "$USENTP" = "true" ]; then
-    case $MAJOROSVERSION in
-      8)
-        csv_format_options "$NTP_SERVERS"
-        timezone_config+=" --ntpservers=$csv_output"
-        ;;
-      9)
-        IFS=" " read -r -a NTP_ARRAY <<< "$NTP_SERVERS" # Safer method for exapanding var in array
-          prefix="timesource  --ntp-server "
-          for ((i=0; i<${#NTP_ARRAY[@]}; i++)); do
-            NTP_ARRAY[i]=$prefix${NTP_ARRAY[$i]}
-          done
-        ;;
-      esac
+  case $MAJOROSVERSION in
+    8)
+      csv_format_options "$NTP_SERVERS"
+      timezone_config+=" --ntpservers=$csv_output"
+      ;;
+    9)
+      IFS=" " read -r -a NTP_ARRAY <<< "$NTP_SERVERS" # Safer method for exapanding var in array
+        prefix="timesource  --ntp-server "
+        for ((i=0; i<${#NTP_ARRAY[@]}; i++)); do
+          NTP_ARRAY[i]=$prefix${NTP_ARRAY[$i]}
+        done
+      ;;
+    esac
 else
-  timezone_config+=" --nontp"
+  if [ "$MAJOROSVERSION" = "8" ]; then
+        timezone_config+=" --nontp"
+  fi
 fi
 
 ### Check for required permissions
@@ -311,6 +315,9 @@ if [ "$CREATEBOOTISO" = "true" ]; then
     exit
   fi
 fi
+
+# Report install target
+echo "$0: kickstart install target is $OSTYPE $MAJOROSVERSION."
 
 ### Check for required files and directories
 
@@ -572,6 +579,11 @@ if [[ "$MAJOROSVERSION" -ge "9" ]] && [[ "$USENTP" = "true" ]]; then
   for element in "${NTP_ARRAY[@]}"; do
     echo "$element" >> "$SRCDIR"/ks.cfg
   done
+fi
+
+if [[ "$MAJOROSVERSION" -ge "9" ]] && [[ "$USENTP" = "false" ]]; then
+  echo "# NTP Not Used" >> "$SRCDIR"/ks.cfg
+  echo "timesource --ntp-disable" >> "$SRCDIR"/ks.cfg
 fi
 
 cat <<EOF >> "$SRCDIR"/ks.cfg
