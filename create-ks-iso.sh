@@ -18,7 +18,7 @@ echo -e "$0: Starting at $(date)"
 : "${OSTYPE:=RHEL}" # Default if not defined
 
 # Major OS Version number
-# We need this because ks.cfg syntax differs between RHEL 8.x and 9.x
+# ks.cfg command syntax varies between RHEL 8.x and 9.x
 : "${MAJOROSVERSION:=9}" # Default if not defined
 
 ############################
@@ -199,6 +199,30 @@ csv_format_options () {
   csv_output=${csv_output%,}
 }
 
+### Set required variables for ISO creation and ensure major OS type and 
+### major OS version number matches the OEM ISO file
+
+if [[ "$CREATEBOOTISO" = "true" || -n "$OEMSRCISO" ]]; then
+  # Capture output from blkid and load into variables. ($LABEL needed for mkisofs later.)
+  # ISO Volume Name must match or boot will fail
+  eval "$(blkid -o export "$ISOSRCDIR"/"$OEMSRCISO")"
+  OSTYPE=$(echo "$LABEL" | grep -oP '^(.*?)(?=\-)') # Match first text field, "-" as delimiter
+  MAJOROSVERSION=$(echo "$LABEL" | grep -oP '(\d{1,2})' | head -n 1) # Match only first 1 or 2 digits, return only first result
+  echo "$0: Source ISO OS is $OSTYPE $MAJOROSVERSION."
+  if [ "$DEBUG" = "true" ]; then
+    echo "$0: ===================================================="
+    echo "$0: DEBUG: Values from blkid of $ISOSRCDIR"/"$OEMSRCISO:"
+    echo "$0: DEBUG: DEVNAME=$DEVNAME"
+    echo "$0: DEBUG: BLOCK_SIZE=$BLOCK_SIZE"
+    echo "$0: DEBUG: UUID=$UUID"
+    echo "$0: DEBUG: LABEL=$LABEL"
+    echo "$0: DEBUG: TYPE=$TYPE"
+    echo "$0: DEBUG: PTUUID=$PTUUID"
+    echo "$0: DEBUG: PTTYPE=$PTTYPE"
+    echo "$0: ===================================================="
+  fi
+fi
+
 ## Network Configuration Logic
 
 # Start of network configuration line in ks.cfg
@@ -342,18 +366,6 @@ if [ "$CREATEBOOTISO" = "true" ]; then
 fi 
 
 echo "$0: Required files and directory checks passed."
-
-### Set required variables for ISO creation and ensure major OS type and 
-### major OS version number matches the OEM ISO file
-
-if [ "$CREATEBOOTISO" = "true" ]; then
-  # Capture output from blkid and load into variables. ($LABEL is what we need for mkisofs below.)
-  # ISO Volume Name must match or boot will fail
-  eval "$(blkid -o export "$ISOSRCDIR"/"$OEMSRCISO")"
-  OSTYPE=$(echo "$LABEL" | grep -oP '^(.*?)(?=\-)') # Match first text field, "-" as delimiter
-  MAJOROSVERSION=$(echo "$LABEL" | grep -oP '(\d{1,2})' | head -n 1) # Match only first 1 or 2 digits, return only first result
-  echo -e "$0: Source ISO OS is $OSTYPE $MAJOROSVERSION."
-fi
 
 ### Check for required packages
 
@@ -655,10 +667,10 @@ if [ "$APPLYOPENSCAPSTIG" = "true" ]; then
       echo "# Apply STIG Settings with OpenSCAP" >> "$SRCDIR"/ks.cfg
       case $MAJOROSVERSION in
         8)
-          echo "%addon org_fedora_oscap"                              >> "$SRCDIR"/ks.cfg
+          echo "%addon org_fedora_oscap" >> "$SRCDIR"/ks.cfg
         ;;
         9)
-          echo "%addon org_redhat_oscap"                              >> "$SRCDIR"/ks.cfg
+          echo "%addon org_redhat_oscap" >> "$SRCDIR"/ks.cfg
         ;;
         esac
       echo "content-type = scap-security-guide"                         >> "$SRCDIR"/ks.cfg
