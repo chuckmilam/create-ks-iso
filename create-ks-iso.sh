@@ -144,7 +144,7 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 # NTP servers will be used
 : "${USENTP:=true}" # Default if not defined
 # NTP servers
-: "${NTP_SERVERS:=0.us.pool.ntp.org 1.us.pool.ntp.org 2.us.pool.ntp.org 3.us.pool.ntp.org}"
+: "${NTP_SERVERS:=0.us.pool.ntp.org 1.us.pool.ntp.org 2.us.pool.ntp.org 3.us.pool.ntp.org}" # Default if not defined
 
 ## Network Configuration Settings 
 : "${NETWORK_ONBOOT:=true}" # Default if not defined
@@ -199,9 +199,8 @@ csv_format_options () {
   csv_output=${csv_output%,}
 }
 
-### Set required variables for ISO creation and ensure major OS type and 
-### major OS version number matches the OEM ISO file
-
+### Set required variables for ISO creation
+## Ensure major OS type and major OS version number matches OEM ISO file
 if [[ "$CREATEBOOTISO" = "true" || -n "$OEMSRCISO" ]]; then
   # Capture output from blkid and load into variables. ($LABEL needed for mkisofs later.)
   # ISO Volume Name must match or boot will fail
@@ -519,9 +518,11 @@ cat <<EOF > "$SRCDIR"/ks.cfg
 #   Parentheticals such as: "(optional), (required)" refer to 
 #   kickstart configuration requirements
 
+## Begin kickstart config:
+
 # Perform installation from the first optical drive on the system. (optional)
 #   Use CDROM installation media, NOTE: This requires the full install DVD ISO. 
-#   The boot iso is only for pointing to a remote install repository.
+#   The netboot iso is only for pointing to a remote install repository.
 cdrom
 
 # Install method (optional) 
@@ -625,36 +626,9 @@ logvol /opt  --fstype='xfs' --size=$LOGVOLSIZEOPT --name=opt --vgname=vg00 --fso
 logvol swap  --$LOGVOLSIZESWAP --fstype='swap' --name=swap --vgname=vg00 
 ## End boot partition information
 
+## Kickstart/anaconda addons
 # STIG Requirement: Disable kdump
 %addon com_redhat_kdump --disable
-%end
-
-%packages
-# Specify an entire environment to be installed as a line starting with the @^ symbols.
-# Note: Only a single environment should be specified in the Kickstart file. 
-# If more environments are specified, only the last specified environment is used.
-# Define a minimal system environment
-@^minimal-environment
-# Initial Setup application starts the first time the system is booted, required
-# when firstboot option is set above. 
-initial-setup
-# STIG-required packages:
-# With STIG oscap profile applied, login will fail unless tmux is installed
-tmux
-# Various package findings are mitigated with the following. Installed here because oscap
-# calls yum to install STIG-required packages, but networking is not yet configured and 
-# Red Hat subscriptions have not yet been registered:
-audispd-plugins
-aide
-dnf-automatic
-libcap-ng-utils
-rsyslog-gnutls
-policycoreutils-python-utils
-chrony
-usbguard
-fapolicyd
-rng-tools
-python3
 %end
 
 EOF
@@ -698,6 +672,36 @@ if [ "$APPLYOPENSCAPSTIG" = "true" ]; then
     ;;
   esac  
 fi
+
+
+cat <<EOF >> "$SRCDIR"/ks.cfg
+%packages
+# Specify an entire environment to be installed as a line starting with the @^ symbols.
+# Note: Only a single environment should be specified in the Kickstart file. 
+# If more environments are specified, only the last specified environment is used.
+# Define a minimal system environment
+@^minimal-environment
+# Initial Setup application starts the first time the system is booted, required
+# when firstboot option is set above. 
+initial-setup
+# STIG-required packages:
+# With STIG oscap profile applied, login will fail unless tmux is installed
+tmux
+# Various package findings are mitigated with the following. Installed here because oscap
+# calls yum to install STIG-required packages, but networking is not yet configured and 
+# Red Hat subscriptions have not yet been registered:
+audispd-plugins
+aide
+dnf-automatic
+libcap-ng-utils
+rsyslog-gnutls
+policycoreutils-python-utils
+chrony
+usbguard
+fapolicyd
+rng-tools
+python3
+%end
 
 ## Bootloader section
 cat <<EOF >> "$SRCDIR"/ks.cfg
