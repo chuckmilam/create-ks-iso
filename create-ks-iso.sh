@@ -399,6 +399,11 @@ if [ "$CREATEBOOTISO" = "true" ] ; then
   check_dependency implantisomd5
 fi
 
+# If kickstart validator checks are set, check for required package
+if [ "$KSVALIDATOR_CHECKS" = "true" ] ; then
+  check_dependency ksvalidator
+fi
+
 # Create directory for creds if it does not exist
 mkdir -p "$CREDSDIR"
 
@@ -808,6 +813,23 @@ chmod 000 /crypto_keyfile.bin
 
 ### Generated with $0 by $USER at $(date)
 EOF
+
+# Run optional kickstart validator checks
+if [ "$KSVALIDATOR_CHECKS" = "true" ] ; then
+  if [ "$OSTYPE" = "RHEL" ] || [ "$KSINBOOTISO" = "CentOS" ]; then
+    # Get list of supported kickstart versions from ksvalidator
+    readarray -t ksvalidator_supported_versions < <(ksvalidator -l)
+    # If ksvalidator supports our target version, run the checks (Use "RHEL" here regardless if target is CentOS)
+    if [[ "${ksvalidator_supported_versions[*]}"  =~ "$RHEL$MAJOROSVERSION" ]]; then
+      ksvalidator -v RHEL"$MAJOROSVERSION" "$SRCDIR"/ks.cfg || { echo "$0: ksvalidator checks: FAILED. Exiting."; exit 1; }
+      echo "$0: ksvalidator checks: PASSED."
+    else
+      echo "$0: ksvalidator does not support $OSTYPE $MAJOROSVERSION. Exiting."; exit 1
+  fi
+      fi
+fi
+
+### Begin ISO modification section
 
 if [ "$CREATEBOOTISO" = "true" ]; then
   # Mount OEM Install Media ISO
