@@ -135,7 +135,7 @@ Things to implement/improve:
 - [ ] Complete CONFIG_FILE template with available variables
 - [x] STIG oscap/anaconda plugin logic based on OS distribution and version
 - [x] Checks for required packages for ISO creation
-- [ ] ksvalidator checks
+- [x] ksvalidator checks
 - [x] Change ntpserver kickstart statement per major OS version (8.x vs 9.x)
 - [ ] Utilize "light" installer ISO for network-based installs
 - [x] Option to create FIPS-enabled boot ISO without baked-in kickstart file
