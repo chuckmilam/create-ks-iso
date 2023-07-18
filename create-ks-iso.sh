@@ -811,6 +811,7 @@ dracut -f
 chmod 000 /crypto_keyfile.bin
 %end
 
+### kickstart install target is: $OSTYPE $MAJOROSVERSION
 ### Generated with $0 by $USER at $(date)
 EOF
 
