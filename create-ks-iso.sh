@@ -97,7 +97,9 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 
 ## User Account Variables
 # Create two bootstrap accounts: One Ansible service account and 
-# one "break glass" emergency admin account.
+# one "break glass" emergency admin account. In keeping with the design
+# philosophy, additional accounts should be configured with the chosen
+# system configuration tools (Ansible, etc.) after kickstart deployment.
 
 # Ansible Service Account
 : "${username_01:=svc.ansible}" # Default if not defined
