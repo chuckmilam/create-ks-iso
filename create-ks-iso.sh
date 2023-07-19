@@ -232,16 +232,16 @@ fi
 network_config="network" 
 # Add options as defined by variables
 
-if [ -n "$HOSTNAME" ]; then
+if [ -n "$KS_HOSTNAME" ]; then
   # Get only hostname portion if using a FQDN
-  short_hostname=${HOSTNAME%%"."*}
+  short_hostname=${KS_HOSTNAME%%"."*}
   hostname_length=${#short_hostname}
   # Check hostname is not greater than 64 characters
   if [ "$hostname_length" -gt '64' ]; then
     echo "$0: kickstart limitation: Hostname cannot exceed 64 characters. Exiting."
     exit 1 
   fi
-  network_config+=" --hostname $HOSTNAME"
+  network_config+=" --hostname $KS_HOSTNAME"
 fi
 
 # Enable network on boot

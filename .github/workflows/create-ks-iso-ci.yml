@@ -16,7 +16,7 @@ jobs:
         - name: Run create-ks-iso script with ksvalidator checks enabled and test configuration values
           run:  docker run --env HOSTNAME --env OSTYPE --env MAJOROSVERSION --env IPADDR --env NETMASK --env GATEWAY --env DNS_SERVERS --env USENTP --env KSVALIDATOR_CHECKS create-ks-iso:ci-test
           env:
-            HOSTNAME: STIG-RHELv8 
+            KS_HOSTNAME: STIG-RHELv8 
             IPADDR: 192.168.1.2
             NETMASK: 255.255.255.0 
             GATEWAY: 192.168.1.1
