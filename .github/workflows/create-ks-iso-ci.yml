@@ -6,6 +6,10 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3
+      - name: Install required packages
+        run: |
+            sudo apt-get update
+            sudo apt-get install grub-common
       - name: Run with default settings
         run: ./create-ks-iso.sh
       - run: echo "Job status is ${{ job.status }}."

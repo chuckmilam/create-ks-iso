@@ -824,7 +824,7 @@ if [ "$KSVALIDATOR_CHECKS" = "true" ] ; then
     readarray -t ksvalidator_supported_versions < <(ksvalidator -l)
     # If ksvalidator supports our target version, run the checks (Use "RHEL" here regardless if target is CentOS)
     if [[ "${ksvalidator_supported_versions[*]}"  =~ "RHEL$MAJOROSVERSION" ]]; then
-      echo "$0: Validating kickstart file "$SRCDIR"/ks.cfg with ksvalidator."
+      echo "$0: Validating kickstart file $SRCDIR/ks.cfg with ksvalidator."
       ksvalidator -v RHEL"$MAJOROSVERSION" "$SRCDIR"/ks.cfg || { echo "$0: ksvalidator checks: FAILED. Exiting."; exit 1; }
       echo "$0: ksvalidator checks: PASSED."
     else
