@@ -1,0 +1,11 @@
+name: Main Script CI Tests
+on: [push]
+jobs:
+  test-defaults:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Run with default settings
+        run: ./create-ks-iso.sh
+      - run: echo "Job status is ${{ job.status }}."

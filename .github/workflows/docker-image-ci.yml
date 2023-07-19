@@ -1,0 +1,21 @@
+name: Docker Image CI
+
+on:
+  push:
+    paths:
+      - 'Dockerfile'
+  pull_request:
+    paths:
+      - 'Dockerfile'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build the Docker image
+      run: docker build . --file Dockerfile --platform linux/amd64 --tag create-ks-iso:$(date +%s)
+    - run: echo "Build status is ${{ job.status }}."
+      
+
+        

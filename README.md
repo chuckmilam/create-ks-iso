@@ -37,6 +37,7 @@ Without a method to provide the encryption key/passphrase to unlock system parti
     * OpenSSH
     * OpenSSL
     * syslinux
+    * pykickstart (for running ksvalidator checks)
 * When creating a custom boot ISO:
     * RHEL-based full install ISO, readable by the user running the script.
     * root/sudo permissions in order to mount the ISO image.
@@ -119,7 +120,7 @@ To get started, from the git cloned directory (example below uses docker, but po
     docker run --privileged --env WRITEPASSWDS="true" --env CREATEBOOTISO="true" --env ENABLEFIPS="true" --env KSINBOOTISO="true" --env password="Password1234" --env CREATEOEMDRVISO="true" --mount type=bind,source=./result,target=/create-ks-iso/result --mount type=bind,source=./isosrc,target=/create-ks-iso/isosrc chuckmilam/create-ks-iso:latest
     ```
 
-The `fedora:latest` image is used instead of the Red Hat UBI because `genisoimage` is not available in the UBI repos. While the Fedora image is not the smallest image, it is not worth the hassle to try to wedge `genisoimage` for this small use case at the moment. 
+The `fedora:latest` image is used instead of Red Hat UBI or Alpine because several required packages are not readily available in the traditionally-used lighter images.
 
 ## Roadmap
 Things to implement/improve:
