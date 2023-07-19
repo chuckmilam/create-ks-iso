@@ -11,7 +11,7 @@ jobs:
         - name: Run create-ks-iso script defaults
           run:  docker run create-ks-iso:ci-test
         - name: Run with ksvalidator checks enabled
-          run:  docker run --env HOSTNAME --env OSTYPE --env MAJOROSVERSION --env USENTP --env KSVALIDATOR_CHECKS create-ks-iso:ci-test
+          run:  docker run --env HOSTNAME --env OSTYPE --env MAJOROSVERSION --env IPADDR --env NETMASK --env GATEWAY --env DNS_SERVERS --env USENTP --env KSVALIDATOR_CHECKS create-ks-iso:ci-test
           env:
             HOSTNAME: STIG-RHELv8 
             IPADDR: 192.168.1.2
@@ -23,4 +23,10 @@ jobs:
             MAJOROSVERSION: 8
             USENTP: true
             KSVALIDATOR_CHECKS: true
+        - name: Show areas of interest in generated ks.cfg
+          run: |
+            grep "network --" result/ks.cfg
+            grep timezone result/ks.cfg
+            grep fips result/ks.cfg | cut -f 1-4 -d ' '
+
 
