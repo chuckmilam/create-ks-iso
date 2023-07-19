@@ -8,6 +8,19 @@ jobs:
         - name: Build the Docker image
           run: docker build . --file Dockerfile --platform linux/amd64 --tag create-ks-iso:ci-test
         - run: echo "Docker build status is ${{ job.status }}."
-        - name: Run with script defaults
+        - name: Run create-ks-iso script defaults
           run:  docker run create-ks-iso:ci-test
+        - name: Run with ksvalidator checks enabled
+          run:  docker run create-ks-iso:ci-test
+          env:
+            HOSTNAME: STIG-RHELv8 
+            IPADDR: 192.168.1.2
+            NETMASK: 255.255.255.0 
+            GATEWAY: 192.168.1.1
+            DNS_SERVERS: 192.168.1.1 8.8.8.8 8.8.4.4
+            ENABLEFIPS: true
+            OSTYPE: RHEL
+            MAJOROSVERSION: 8
+            USENTP: true
+            KSVALIDATOR_CHECKS: true
 
