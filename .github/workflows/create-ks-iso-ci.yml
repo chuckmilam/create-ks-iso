@@ -9,19 +9,9 @@ jobs:
           run: docker build . --file Dockerfile --platform linux/amd64 --tag create-ks-iso:ci-test
         - run: echo "Docker build status is ${{ job.status }}."
         - name: Run create-ks-iso script defaults
-          run:  docker run create-ks-iso:ci-test
-        - name: Show areas of interest in generated ks.cfg
-          run: |
-            grep "network --" /create-ks-iso/result/ks.cfg
-            grep timezone /create-ks-iso/result/ks.cfg
-            grep fips /create-ks-iso/result/ks.cfg | cut -f 1-4 -d ' '
+          run: docker run create-ks-iso:ci-test
         - name: Run with ksvalidator checks enabled
           run:  docker run --env HOSTNAME --env OSTYPE --env MAJOROSVERSION --env IPADDR --env NETMASK --env GATEWAY --env DNS_SERVERS --env USENTP --env KSVALIDATOR_CHECKS create-ks-iso:ci-test
-        - name: Show areas of interest in generated ks.cfg
-          run: |
-            grep "network --" /create-ks-iso/result/ks.cfg
-            grep timezone /create-ks-iso/result/ks.cfg
-            grep fips /create-ks-iso/result/ks.cfg | cut -f 1-4 -d ' '
           env:
             HOSTNAME: STIG-RHELv8 
             IPADDR: 192.168.1.2
