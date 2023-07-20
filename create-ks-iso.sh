@@ -373,7 +373,6 @@ fi
 echo "$0: Required files and directory checks passed."
 
 ### Check for required packages
-
 # Required to create grub bootloader password hashes
 check_dependency grub2-mkpasswd-pbkdf2
 
