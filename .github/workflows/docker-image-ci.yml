@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --platform linux/amd64 --tag create-ks-iso:ci-test
+      run: docker build . --file Dockerfile --platform linux/amd64 --tag create-ks-iso
     - run: echo "Build status is ${{ job.status }}."
 
 
