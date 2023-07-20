@@ -12,9 +12,26 @@ jobs:
           run: docker build . --file Dockerfile --platform linux/amd64 --tag create-ks-iso:ci-test
         - run: echo "Docker build status is ${{ job.status }}."
         - name: Run create-ks-iso script defaults (no config vars set)
-          run: docker run create-ks-iso:ci-test
+          run: >
+            docker run create-ks-iso:ci-test
+            --mount type=bind,source=./result,target=/create-ks-iso/result
+            --mount type=bind,source=./isosrc,target=/create-ks-iso/isosrc
+        - name: Show areas of interest in generated ks.cfg
+          run: |
+            grep "network --" result/ks.cfg
+            grep timezone result/ks.cfg
+            grep fips result/ks.cfg | cut -f 1-4 -d ' '
         - name: Run create-ks-iso script with ksvalidator checks enabled and test configuration values
-          run:  docker run --env HOSTNAME --env OSTYPE --env MAJOROSVERSION --env IPADDR --env NETMASK --env GATEWAY --env DNS_SERVERS --env USENTP --env KSVALIDATOR_CHECKS create-ks-iso:ci-test
+          run: >
+            docker run --env HOSTNAME --env OSTYPE --env MAJOROSVERSION --env IPADDR --env NETMASK --env GATEWAY
+            --env DNS_SERVERS --env USENTP --env KSVALIDATOR_CHECKS create-ks-iso:ci-test
+            --mount type=bind,source=./result,target=/create-ks-iso/result
+            --mount type=bind,source=./isosrc,target=/create-ks-iso/isosrc
+        - name: Show areas of interest in generated ks.cfg
+          run: |
+            grep "network --" result/ks.cfg
+            grep timezone result/ks.cfg
+            grep fips result/ks.cfg | cut -f 1-4 -d ' '
           env:
             KS_HOSTNAME: STIG-RHELv8 
             IPADDR: 192.168.1.2
