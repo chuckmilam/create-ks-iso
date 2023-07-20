@@ -17,7 +17,7 @@ jobs:
             --mount type=bind,source=./result,target=/create-ks-iso/result
             --mount type=bind,source=./isosrc,target=/create-ks-iso/isosrc
         - name: Copy ks.cfg out from container
-          run: docker cp create-ks-iso:/create-ks-iso/create-ks-iso/result/ks.cfg .
+          run: docker cp create-ks-iso:/create-ks-iso/result/ks.cfg .
         - name: Debug - list files
           run: pwd; ls -la
         - name: Show areas of interest in generated ks.cfg
