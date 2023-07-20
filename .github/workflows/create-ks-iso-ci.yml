@@ -14,30 +14,10 @@ jobs:
         - name: Run create-ks-iso script defaults (no config vars set)
           run: >
             docker run --privileged create-ks-iso
-            --mount type=bind,source=./result,target=/create-ks-iso/result
-            --mount type=bind,source=./isosrc,target=/create-ks-iso/isosrc
-        - name: Copy ks.cfg out from container
-          run: docker cp create-ks-iso:/create-ks-iso/result/ks.cfg .
-        - name: Debug - list files
-          run: pwd; ls -la
-        - name: Show areas of interest in generated ks.cfg
-          run: |
-            grep "network --" result/ks.cfg
-            grep timezone result/ks.cfg
-            grep fips result/ks.cfg | cut -f 1-4 -d ' '
         - name: Run create-ks-iso script with ksvalidator checks enabled and test configuration values
           run: >
             docker run --privileged --env HOSTNAME --env OSTYPE --env MAJOROSVERSION --env IPADDR --env NETMASK 
             --env GATEWAY --env DNS_SERVERS --env USENTP --env KSVALIDATOR_CHECKS create-ks-iso
-            --mount type=bind,source=./result,target=/create-ks-iso/result
-            --mount type=bind,source=./isosrc,target=/create-ks-iso/isosrc
-        - name: Copy ks.cfg out from container
-          run: docker cp create-ks-iso:result/ks.cfg .
-        - name: Show areas of interest in generated ks.cfg
-          run: |
-            grep "network --" result/ks.cfg
-            grep timezone result/ks.cfg
-            grep fips result/ks.cfg | cut -f 1-4 -d ' '
           env:
             KS_HOSTNAME: STIG-RHELv8 
             IPADDR: 192.168.1.2
