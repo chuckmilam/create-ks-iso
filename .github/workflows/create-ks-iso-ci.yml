@@ -1,8 +1,8 @@
 name: Basic CI Tests using Docker 
 on: 
     push:
-        paths:
-            - 'create-ks-iso.sh'
+        paths-ignore:
+            - 'README.md'
 jobs:
     test-create-ks-iso:
         runs-on: ubuntu-latest
