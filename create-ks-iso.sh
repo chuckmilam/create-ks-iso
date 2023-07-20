@@ -385,7 +385,7 @@ if [[ -z "$ssh_pub_key_username_01" || -z "$ssh_pub_key_username_02" ]] ; then
   check_dependency ssh-keygen
 fi
 
-# If ISOs are to be created mkisofs is a dependency
+# If ISOs are to be created, mkisofs is a dependency
 if [ "$CREATEBOOTISO" = "true" ] || [ "$CREATEOEMDRVISO" = "true" ]; then
   check_dependency mkisofs
 fi
@@ -420,11 +420,13 @@ esac
 # Warn if FIPS mode is set but CREATEBOOTISO is not set
 if [ "$ENABLEFIPS" = "true" ] && [ "$CREATEBOOTISO" = "false" ]; then
   echo -e "$0:"
-  echo -e "$0: *************************************************************"
-  echo -e "$0: *  WARNING: FIPS mode set while CREATEBOOTISO is NOT set.   *" 
-  echo -e "$0: *  WARNING: Inconsistent FIPS checks likely unless the      *"
-  echo -e "$0: *  WARNING: system is installed with the modified boot ISO. *"
-  echo -e "$0: *************************************************************"
+  echo -e "$0: *****************************************************************"
+  echo -e "$0: * WARNING: FIPS mode set while CREATEBOOTISO is NOT set.        *" 
+  echo -e "$0: * WARNING: Inconsistent FIPS checks will result unless:         *"
+  echo -e "$0: * WARNING:  1. System is installed with modified boot ISO.      *"
+  echo -e "$0: *                          - OR -                               *"
+  echo -e "$0: * WARNING:  2. System booted with 'fips=1' bootloader argument. *"
+  echo -e "$0: *****************************************************************"
   echo -e "$0:"
 fi
 
