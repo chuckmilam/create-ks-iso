@@ -1,4 +1,4 @@
-name: Basic CI Tests using Docker 
+name: Container-Based CI Tests
 on: 
     push:
         paths-ignore:
