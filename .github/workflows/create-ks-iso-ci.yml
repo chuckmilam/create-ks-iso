@@ -17,7 +17,7 @@ jobs:
             --mount type=bind,source=./result,target=/create-ks-iso/result
             --mount type=bind,source=./isosrc,target=/create-ks-iso/isosrc
         - name: Debug - list files
-          run: pwd; ls -la ..
+          run: pwd; ls -la /create-ks-iso
         - name: Show areas of interest in generated ks.cfg
           run: |
             grep "network --" ./result/ks.cfg
