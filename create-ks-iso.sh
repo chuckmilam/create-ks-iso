@@ -61,7 +61,7 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 #: "${OEMSRCISO:=rhel-9.2-x86_64-dvd.iso}" # Default if not defined
 
 # New ISO file prefix
-: "${NEWISONAMEPREFIX:=Random_Creds-}" # Default if not defined
+: "${NEWISONAMEPREFIX:=}" # Default if not defined
 
 # File Name for newly-created final ISO file
 : "${NEWISONAME:=$NEWISONAMEPREFIX$OEMSRCISO}" # Default if not defined
@@ -222,6 +222,19 @@ if [[ "$CREATEBOOTISO" = "true" || -n "$OEMSRCISO" ]]; then
     echo "$0: ===================================================="
   fi
 fi
+
+## Set prefixes on new boot ISO file dynamically if not defined
+if [ "$CREATEBOOTISO" = "true" ]; then
+  if [ -z "$NEWISONAMEPREFIX" ]; then
+    if [ "$ENABLEFIPS" = "true" ]; then
+      NEWISONAMEPREFIX="FIPS-"
+    fi
+    if [ "$KSINBOOTISO" = "true" ]; then
+      NEWISONAMEPREFIX+="Embedded-kickstart-"
+    fi
+    NEWISONAME=$NEWISONAMEPREFIX$OEMSRCISO
+  fi
+fi 
 
 ## Network Configuration Logic
 
