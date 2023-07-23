@@ -1,7 +1,7 @@
 # Create kickstart (ISO)
 [![Basic CI Tests using Docker](https://github.com/chuckmilam/create-ks-iso/actions/workflows/create-ks-iso-ci.yml/badge.svg)](https://github.com/chuckmilam/create-ks-iso/actions/workflows/create-ks-iso-ci.yml)
 
-Dynamically creates a STIG-compliant kickstart file with randomly-generated bootstrap user credentials for compliance testing in an automation pipeline. Includes options for creating custom install ISO images to enable non-interactive FIPS-compliant installations of RHEL-based Linux distributions.
+Dynamically creates a kickstart file with randomly-generated bootstrap user credentials, useful for STIG compliance testing in an automation pipeline. Includes options for creating custom install ISO images to enable non-interactive FIPS-compliant installations of a RHEL-based Linux distributions.
 
 ## Overview
 create-ks-iso.sh is intended to be a simple, lightweight, dynamic solution to generate a STIG-compliant kickstart file and installer boot ISO image. Optionally, the user can create an OEMDRV ISO for delivering the kickstart file to the system installer; useful in environments where PXE boot or similar network delivery methods may not be available. Bootstrap user credentials may be either randomly-generated or specifically declared as required to fit operational needs. The kickstart file can be tailored at the point of generation. Default settings are easily changed either by editing the included [CONFIG_FILE](CONFIG_FILE) template or by setting environment variables at runtime, potentially allowing for use in automation pipelines.
