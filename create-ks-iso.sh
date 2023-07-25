@@ -519,7 +519,7 @@ cat <<EOF > "$SRCDIR"/ks.cfg
 #  Basic Kickstart for STIG-Compliant Installs  #
 #################################################
 #
-# This kickstart configuration defines the bare-minimum framework
+# This kickstart configuration defines a minimal foundation
 # for STIG-compliant Red Hat-based OS distribution installations.  
 # Project home: https://github.com/chuckmilam/create-ks-iso
 #
@@ -531,9 +531,9 @@ cat <<EOF > "$SRCDIR"/ks.cfg
 #   5. Dynamically-created bootstrap users credentials
 #
 # Design Philosopy: 
-#   Only minimal system configurations should be made here, those required at 
-#   install time. Further STIG compliance and system configuration should be 
-#   accomplished with Ansible or similar tools.
+#   Only minimal system configurations are made here, those required
+#   at install time. Further STIG compliance and system configuration
+#   should be accomplished with Ansible or similar tools.
 #  
 # Assumptions: 
 #   1. Support infrastucture such as clevis/tang systems are not available.
@@ -635,7 +635,7 @@ reqpart --add-boot
 volgroup vg00 --pesize=4096 pv.01
 
 # Create Logical Volumes
-# Separate Disk Partitions Required by STIG
+# Separate Disk Partitions and Filesystem Settings Required by STIG
 logvol /  --fstype='xfs' --size=$LOGVOLSIZEROOT --name=root --vgname=vg00 
 # Ensure /tmp Located On Separate Partition
 logvol /tmp  --fstype='xfs' --size=$LOGVOLSIZETMP --name=tmp --vgname=vg00 --fsoptions='nodev,noexec,nosuid'
