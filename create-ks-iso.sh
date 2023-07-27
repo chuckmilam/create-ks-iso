@@ -73,6 +73,10 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 # Best to not change this, some Red Hat internals look for this specific name
 : "${KSCFGDESTFILENAME:=ks.cfg}" # Default if not defined
 
+# Location for kickstart file, used when KSINBOOTISO is set
+# Default is on the ISO file
+: "${KSLOCATION:=cdrom:\/ks.cfg}" # Default if not defined
+
 # Temporary mount point for OEM Source Media
 ISOMNTDIR="$SRCDIR/mnt"
 ISOTMPMNT="$ISOMNTDIR/iso"
@@ -864,9 +868,9 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   if [ "$ENABLEFIPS" = "true" ] && [ "$KSINBOOTISO" = "true" ]; then
     # Modify isolinux.cfg for FIPS mode and ks boot
     echo -e "$0: Setting FIPS mode and ks.cfg location in ISO bootloader (FIPS: ON, kickstart in ISO: ON)"
-    sed -i '/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/isolinux/isolinux.cfg
+    sed -i "/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=$KSLOCATION quiet/" "$WORKDIR"/isolinux/isolinux.cfg
     # Modify grub.cfg for FIPS mode and ks boot
-    sed -i '/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/EFI/BOOT/grub.cfg
+    sed -i "/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=$KSLOCATION quiet/" "$WORKDIR"/EFI/BOOT/grub.cfg
     # Modify isolinux.cfg menu title
     sed -i 's/menu label Install/menu label FIPS mode with kickstart Install/' "$WORKDIR"/isolinux/isolinux.cfg
     # Modify grub.cfg menu entries
@@ -880,9 +884,9 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   if [ "$ENABLEFIPS" = "false" ] && [ "$KSINBOOTISO" = "true" ]; then
       # Modify isolinux.cfg ks boot, no FIPS mode
       echo -e "$0: Setting ks.cfg location in ISO bootloader (FIPS: OFF, kickstart in ISO: ON)"
-      sed -i '/rescue/!s/ quiet/ inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/isolinux/isolinux.cfg
+      sed -i "/rescue/!s/ quiet/ inst.ks=$KSLOCATION quiet/" "$WORKDIR"/isolinux/isolinux.cfg
       # Modify grub.cfg for ks boot, no FIPS mode
-      sed -i '/rescue/!s/ quiet/ inst.ks=cdrom:\/ks.cfg quiet/' "$WORKDIR"/EFI/BOOT/grub.cfg
+      sed -i "/rescue/!s/ quiet/ inst.ks=$KSLOCATION quiet/" "$WORKDIR"/EFI/BOOT/grub.cfg
       # Modify isolinux.cfg menu title
       sed -i 's/menu label Install/menu label kickstart Install/' "$WORKDIR"/isolinux/isolinux.cfg
       # Modify grub.cfg menu entries to show RandomCreds
