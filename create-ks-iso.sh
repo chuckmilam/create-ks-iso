@@ -441,7 +441,7 @@ if [ "$ENABLEFIPS" = "true" ] && [ "$CREATEBOOTISO" = "false" ]; then
   echo -e "$0: * WARNING: FIPS mode set while CREATEBOOTISO is NOT set.        *" 
   echo -e "$0: * WARNING: Inconsistent FIPS checks will result unless:         *"
   echo -e "$0: * WARNING:  1. System is installed with modified boot ISO.      *"
-  echo -e "$0: *                          - OR -                               *"
+  echo -e "$0: * WARNING:                    - OR -                            *"
   echo -e "$0: * WARNING:  2. System booted with 'fips=1' bootloader argument. *"
   echo -e "$0: *****************************************************************"
   echo -e "$0:"
