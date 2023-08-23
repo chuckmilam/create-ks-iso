@@ -806,6 +806,11 @@ Remove this message by updating the /etc/issue file.
 
 EOF_issue
 
+## Set password change date to yesterday, prevents SSH access issues once STIGs are applied
+chage -d \$(date -d -1days +%Y-%m-%d) root
+chage -d \$(date -d -1days +%Y-%m-%d) $username_01
+chage -d \$(date -d -1days +%Y-%m-%d) $username_02
+
 ## Set up LUKS pv decryption unlock
 # Create a [long] random key and place it in file
 dd bs=512 count=4 if=/dev/urandom of=/crypto_keyfile.bin
