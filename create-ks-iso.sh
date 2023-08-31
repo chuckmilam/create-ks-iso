@@ -73,8 +73,11 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 # Best to not change this, some Red Hat internals look for this specific name
 : "${KSCFGDESTFILENAME:=ks.cfg}" # Default if not defined
 
+# kickstart file Result/Output Location
+: "${KSRESULTDIR:=$OUTPUTDIR/ks}" # Default if not defined
+
 # Kickstart file location passed to bootloader when KSINBOOTISO is set
-# Default is on the ISO file, but could be a network location, etc.
+# Default is on the ISO file, but could be a network locati
 : "${KSLOCATION:=cdrom:\/ks.cfg}" # Default if not defined
 
 # Temporary mount point for OEM Source Media
@@ -421,6 +424,9 @@ fi
 
 # Create directory for creds if it does not exist
 mkdir -p "$CREDSDIR"
+
+# Create directory for kickstart file if it does not exist
+mkdir -p "$KSRESULTDIR"
 
 ## FIPS Mode Switch
 : "${ENABLEFIPS:=false}" # Default if not defined
@@ -978,8 +984,8 @@ chmod 700 "$CREDSDIR"
 echo -e "$0: Setting ownership of kickstart file"
 chown "$SUDO_UID":"$SUDO_GID" "$SRCDIR"/"$KSCFGSRCFILE"
 chmod 640 "$SRCDIR"/"$KSCFGSRCFILE"
-echo -e "$0: Moving kickstart file to $OUTPUTDIR"
-mv "$SRCDIR"/"$KSCFGSRCFILE" "$OUTPUTDIR"
+echo -e "$0: Moving kickstart file to $KSRESULTDIR"
+mv "$SRCDIR"/"$KSCFGSRCFILE" "$KSRESULTDIR"
 
 # Let everyone know we're done here
 echo -n "$0: Total run time: "
