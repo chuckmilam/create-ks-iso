@@ -151,7 +151,7 @@ Things to implement/improve:
 The initial script harkens back to when I first started using kickstart sometime around 2007-2008 to automate the deployment of 200+ Linux workstations where the systems had to be securely wiped and redeployed frequently. Later, adding requirements for STIG compliance brought on additional challenges. The increased pace of rapid prototyping and testing helped streamline it further. Now I'm looking to use it for automated pipeline testing in places where containers don't quite make sense.
 
 ## Acknowledgments
-This project utilized the following resources:
+This project references and acknowledges the following resources:
 * [How to create a modified Red Hat Enterprise Linux ISO with kickstart file or modified installation media](https://access.redhat.com/solutions/60959)
 * [How to generate a SHA-2 (sha256 or sha512) hashed password compatible with /etc/shadow](https://access.redhat.com/solutions/221403)
 * [Appendix B. Kickstart commands and options reference](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/performing_an_advanced_rhel_9_installation/kickstart-commands-and-options-reference_installing-rhel-as-an-experienced-user)
