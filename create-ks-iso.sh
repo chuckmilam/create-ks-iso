@@ -73,8 +73,8 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 # Best to not change this, some Red Hat internals look for this specific name
 : "${KSCFGDESTFILENAME:=ks.cfg}" # Default if not defined
 
-# Location for kickstart file, used when KSINBOOTISO is set
-# Default is on the ISO file
+# Kickstart file location passed to bootloader when KSINBOOTISO is set
+# Default is on the ISO file, but could be a network location, etc.
 : "${KSLOCATION:=cdrom:\/ks.cfg}" # Default if not defined
 
 # Temporary mount point for OEM Source Media
