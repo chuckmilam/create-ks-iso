@@ -127,6 +127,7 @@ The `fedora:latest` image is used instead of Red Hat UBI or Alpine because sever
 ## Roadmap
 Things to implement/improve:
 - [x] Move ks.cfg into its own subdir under result
+- [x] Modify /etc/issue message to include username
 - [x] Replace soon-to-be-deprecated python `crypt` module in `encrypt_random_passwd` function.
 - [x] Make configurable as variables in ks.cfg:
     - [x] Disk partition sizes
