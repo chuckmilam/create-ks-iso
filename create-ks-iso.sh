@@ -118,8 +118,8 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 # "Break Glass" Emergency Admin Account
 : "${username_02:=alt.admin}" # Default if not defined
 : "${username_02_gecos:=Emergency Admin Account}" # Default if not defined
-: "${username_01_uid:=5002}" # Default if not defined
-: "${username_01_gid:=5002}" # Default if not defined
+: "${username_02_uid:=5002}" # Default if not defined
+: "${username_02_gid:=5002}" # Default if not defined
 
 # Password length 
 : "${passwd_len:=16}" # Default if not defined
