@@ -99,19 +99,27 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 # Write plaintext passwords to files
 : "${WRITEPASSWDS:=false}" # Default if not defined
 
-## User Account Variables
+##########################
+# User Account Variables #
+##########################
+
 # Create two bootstrap accounts: One Ansible service account and 
 # one "break glass" emergency admin account. In keeping with the design
 # philosophy, additional accounts should be configured with the chosen
 # system configuration tools (Ansible, etc.) after kickstart deployment.
+# User uids and gids default to above 5000 per Red Hat recommended practice.
 
 # Ansible Service Account
 : "${username_01:=svc.ansible}" # Default if not defined
-: "${username_01_gecos:=Ansible Service Account}" # Default if not defined 
+: "${username_01_gecos:=Ansible Service Account}" # Default if not defined
+: "${username_01_uid:=5001}" # Default if not defined
+: "${username_01_gid:=5001}" # Default if not defined
 
 # "Break Glass" Emergency Admin Account
 : "${username_02:=alt.admin}" # Default if not defined
-: "${username_02_gecos:=Emergency Admin Account}" # Default if not defined 
+: "${username_02_gecos:=Emergency Admin Account}" # Default if not defined
+: "${username_02_uid:=5002}" # Default if not defined
+: "${username_02_gid:=5002}" # Default if not defined
 
 # Password length 
 : "${passwd_len:=16}" # Default if not defined
@@ -775,8 +783,8 @@ rootpw --iscrypted $encrypted_password
 #     alt.admin is "break glass" alternate emergency account
 #     alt.admin can login remotely. 
 #     Direct root login is only allowed from console.
-user --name=$username_01 --groups=wheel --gecos='$username_01_gecos' --password=$encrypted_password_username_01 --iscrypted
-user --name=$username_02 --groups=wheel --gecos='$username_02_gecos' --password=$encrypted_password_username_02 --iscrypted
+user --name=$username_01 --groups=wheel --gecos='$username_01_gecos' --uid=$username_01_uid --gid=$username_01_gid --password=$encrypted_password_username_01 --iscrypted
+user --name=$username_02 --groups=wheel --gecos='$username_02_gecos' --uid=$username_02_uid --gid=$username_02_gid --password=$encrypted_password_username_02 --iscrypted
 
 # sshkey (optional)
 # Adds SSH key to the authorized_keys file of the specified user
