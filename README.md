@@ -149,7 +149,7 @@ Things to implement/improve:
 - [x] Warning if setting FIPS mode without creating boot ISO
 
 ## History
-The initial script harkens back to when I first started using kickstart sometime around 2007-2008 to automate the deployment of 200+ Linux workstations where the systems had to be securely wiped and redeployed frequently. Later, adding requirements for STIG compliance brought on additional challenges. The increased pace of rapid prototyping and testing helped streamline it further. Now I'm looking to use it for automated pipeline testing in places where containers don't quite make sense.
+The initial script harkens back to when I first started using kickstart. Sometime around 2007-2008, I had to automate the deployment of 200+ Linux workstations where systems had to be securely disk-wiped and redeployed frequently. PXE booting and kickstart were life (and sanity) savers. Later, adding requirements for STIG compliance brought on additional challenges. The increased pace of rapid prototyping and testing helped streamline it further. Now I'm looking to use it for automated pipeline testing in places where containers don't quite make sense.
 
 ## Acknowledgments
 This project references and acknowledges the following resources:

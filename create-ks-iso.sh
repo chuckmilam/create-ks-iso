@@ -777,12 +777,7 @@ cat <<EOF >> "$SRCDIR"/ks.cfg
 rootpw --iscrypted $encrypted_password
 
 # user (optional)
-#   User Notes:
-#     Users in group wheel can sudo and elevate
-#     svc.ansible is initial provisioning account using SSH keys
-#     alt.admin is "break glass" alternate emergency account
-#     alt.admin can login remotely. 
-#     Direct root login is only allowed from console.
+# User Notes: Users in group wheel can sudo and elevate. Direct root login is only allowed from console.
 user --name=$username_01 --groups=wheel --gecos='$username_01_gecos' --uid=$username_01_uid --gid=$username_01_gid --password=$encrypted_password_username_01 --iscrypted
 user --name=$username_02 --groups=wheel --gecos='$username_02_gecos' --uid=$username_02_uid --gid=$username_02_gid --password=$encrypted_password_username_02 --iscrypted
 
