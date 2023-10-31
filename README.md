@@ -147,6 +147,7 @@ Things to implement/improve:
 - [ ] Option to specify a different kickstart location (HTTP/S, NFS, etc.)
 - [ ] Option to write generated SSH keys and passwords into ISO
 - [x] Warning if setting FIPS mode without creating boot ISO
+- [ ] Option to turn off STIG-specific settings for non-STIG use cases
 
 ## History
 The initial script harkens back to when I first started using kickstart. Sometime around 2007-2008, I had to automate the deployment of 200+ Linux workstations where systems had to be securely disk-wiped and redeployed frequently. PXE booting and kickstart were life (and sanity) savers. Later, adding requirements for STIG compliance brought on additional challenges. The increased pace of rapid prototyping and testing helped streamline it further. Now I'm looking to use it for automated pipeline testing in places where containers don't quite make sense.
