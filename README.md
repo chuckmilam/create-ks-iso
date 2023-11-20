@@ -45,7 +45,7 @@ Without a method to provide the encryption key/passphrase to unlock system parti
     * root/sudo permissions in order to mount the ISO image.
     * Sufficient disk space for ISO creation. Enough is needed for the source OEM install ISO, temporary space for the extracted OEM install ISO, and then the final custom boot ISO. Consider that RHEL 8 and 9 boot ISOs are between 9-12G in size, so plan on at least 3x that size.
 
-There is also a [container-based option](#docker-or-podman-usage) that has been tested with Docker/Podman. This method frees up the need to [chase dependencies](#requirements) on the host system, and it even works on Windows hosts, good for chicken-and-egg problems in Microsoft-first environments.
+There is also a [container-based option](#docker-or-podman-usage) that has been tested with Docker/Podman. This method frees up the need to [chase dependencies](#requirements) on the host system, and it even works on Windows hosts. It's good for chicken/egg problems in Microsoft-first environments or when moving to a new major Linux distro release version.
 
 ## Installation
 No installation is required, and this can be run directly from a user home directory.

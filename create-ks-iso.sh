@@ -858,7 +858,7 @@ if [ "$KSVALIDATOR_CHECKS" = "true" ] ; then
       ksvalidator -v RHEL"$MAJOROSVERSION" "$SRCDIR"/ks.cfg || { echo "$0: ksvalidator checks: FAILED. Exiting."; exit 1; }
       echo "$0: ksvalidator checks: PASSED."
     else
-      echo "$0: ksvalidator does not support $OSTYPE $MAJOROSVERSION. Exiting."; exit 1
+      echo "$0: This version of ksvalidator does not support $OSTYPE $MAJOROSVERSION. Exiting."; exit 1
   fi
       fi
 fi
