@@ -1,7 +1,7 @@
 # Create kickstart (ISO)
 [![Basic CI Tests using Docker](https://github.com/chuckmilam/create-ks-iso/actions/workflows/create-ks-iso-ci.yml/badge.svg)](https://github.com/chuckmilam/create-ks-iso/actions/workflows/create-ks-iso-ci.yml)
 
-Dynamically creates a kickstart file with randomly-generated bootstrap user credentials, useful for STIG compliance testing in an automation pipeline. Includes options for creating custom install ISO images to enable non-interactive FIPS-compliant installations of a RHEL-based Linux distributions.
+Dynamically creates a kickstart file with optional randomly-generated bootstrap user credentials, useful for STIG compliance testing in an automation pipeline. Includes options for creating custom ISO images to enable non-interactive FIPS-compliant installations of a RHEL-based Linux distributions.
 
 ## Overview
 create-ks-iso.sh is intended to be a simple, lightweight, dynamic solution to generate a STIG-compliant kickstart file and installer boot ISO image. Optionally, the user can create an OEMDRV ISO for delivering the kickstart file to the system installer; useful in environments where PXE boot or similar network delivery methods may not be available. Bootstrap user credentials may be either randomly-generated or specifically declared as required to fit operational needs. The kickstart file can be tailored at the point of generation. Default settings are easily changed either by editing the included [CONFIG_FILE](CONFIG_FILE) template or by setting environment variables at runtime, potentially allowing for use in automation pipelines.
@@ -25,9 +25,11 @@ Anecdotally, inspectors/auditors may ask for proof that the system was installed
 #### Whole-Disk Encryption
 The RHEL 8 STIG introduced the *de facto* requirement that [all system partitions are encrypted](https://www.stigviewer.com/stig/red_hat_enterprise_linux_8/2021-06-14/finding/V-230224), unless *"...there is a documented and approved reason for not having data-at-rest encryption...."* 
 
-Again, anecdotally, it is easier to comply with the STIG check than try to argue with an inspector or auditor about just what *"documented and approved"* means. 
+The RHEL 9 STIG took this a step further, making [data-at-rest encryption a CAT I / HIGH Severity STIG finding](https://www.stigviewer.com/stig/red_hat_enterprise_linux_9/2023-09-13/finding/V-257879). The exception where *"...there is a documented and approved reason for not having data-at-rest encryption, this requirement is Not Applicable."* is still present.
 
-Without a method to provide the encryption key/passphrase to unlock system partitions, the system will hang at boot waiting for the passphrase to be typed in at the console. If each individual partition is encrypted, then a passphrase must be entered for every one. This project provides a method of "baking in" the keyfile to auto-decrypt the system partitions without the need to set up a clevis/tang environment. By encrypting the LVM physical volume instead of the logical volumes, resize operations can occur while leaving disk encryption in place.
+Again, anecdotally, it is easier to comply with the STIG check than try to debate an inspector or auditor over just what *"documented and approved"* means. 
+
+Without a method to provide the encryption key/passphrase to unlock system partitions, the system will hang at boot waiting for the passphrase to be typed in at the console. If each individual partition is encrypted, then a passphrase must be entered for every partition. This project provides a method of "baking in" the keyfile to auto-decrypt the system partitions without the need to set up a clevis/tang environment. By encrypting the LVM physical volume instead of the logical volumes, resize operations can occur while leaving disk encryption in place.
 
 ## Requirements
 * A Linux system. RHEL/CentOS, Ubuntu, and WSL have all been tested successfully, but primary focus has been on Red Hat-derived distributions. System should have these packages installed:
@@ -45,10 +47,10 @@ Without a method to provide the encryption key/passphrase to unlock system parti
     * root/sudo permissions in order to mount the ISO image.
     * Sufficient disk space for ISO creation. Enough is needed for the source OEM install ISO, temporary space for the extracted OEM install ISO, and then the final custom boot ISO. Consider that RHEL 8 and 9 boot ISOs are between 9-12G in size, so plan on at least 3x that size.
 
-There is also a [container-based option](#docker-or-podman-usage) that has been tested with Docker/Podman. This method frees up the need to [chase dependencies](#requirements) on the host system, and it even works on Windows hosts. It's good for chicken/egg problems in Microsoft-first environments or when moving to a new major Linux distro release version.
+There is also a [container-based option](#docker-or-podman-usage) that has been tested with Docker/Podman. This method frees up the need to [chase dependencies](#requirements) on the host system, and it even works on Windows hosts. It's good for chicken/egg problems in Microsoft-first environments or when moving to a new major Linux distribution release version.
 
 ## Installation
-No installation is required, and this can be run directly from a user home directory.
+No installation is required, and this can be run directly from a user home directory on Linux systems.
 To use create-ks-iso, simply clone the GitHub repository:
 ```
 git clone https://github.com/chuckmilam/create-ks-iso
@@ -59,6 +61,7 @@ cd create-ks-iso
 ./create-ks-iso.sh
 ```
 Assuming all dependency checks pass, the default settings will generate a kickstart file (ks.cfg) in the current working directory, as well as some SSH keys in the "creds" directory. 
+
 No ISOs are created unless the default settings are changed.
 
 ## Usage
@@ -82,6 +85,8 @@ CREATEOEMDRVISO="true" ./create-ks-iso.sh
 Attach this OEMDRV ISO to the machine to be installed in a second CD/DVD drive and boot from the first CD/DVD drive. It should load and run the kickstart install automatically.
 
 ### Generate a Custom RHEL Boot ISO with FIPS mode enabled
+For this option, a RHEL-based full install ISO, readable by the user running the script, must be available. Default location for this install ISO is `$SRCDIR/isosrc`, but can be controlled by the `ISOSRCDIR` variable.
+
 Note the use of `sudo -E` to ensure the environment variables are passed into the sudo session.
 ```Shell
 CREATEBOOTISO="true" ENABLEFIPS="true" sudo -E ./create-ks-iso.sh
@@ -89,12 +94,13 @@ CREATEBOOTISO="true" ENABLEFIPS="true" sudo -E ./create-ks-iso.sh
 
 ### Generate a Custom RHEL Boot ISO with FIPS mode enabled with ks.cfg built-in
 This option bakes the kickstart file directly into the boot ISO, useful for systems limited to only a single bootable drive for the ISO image.
-Again, note the use of `sudo -E` to ensure the environment variables are passed into the sudo session.
+
+Again, a RHEL-based install ISO is required as above, and note the use of `sudo -E` to ensure the environment variables are passed into the sudo session.
 ```Shell
 CREATEBOOTISO="true" KSINBOOTISO="true" ENABLEFIPS="true" sudo -E ./create-ks-iso.sh
 ```
 ### Sanitize the working directories
-Run the sanitize script to remove any generated user credential, kickstart, and ISO files.
+Run the sanitize script to remove any generated user credentials, kickstart, and ISO files.
 ```Shell
 ./sanitize-create-ks-iso.sh
 ```
@@ -122,7 +128,7 @@ To get started, from the git cloned directory (example below uses docker, but po
     docker run --privileged --env WRITEPASSWDS="true" --env CREATEBOOTISO="true" --env ENABLEFIPS="true" --env KSINBOOTISO="true" --env password="Password1234" --env CREATEOEMDRVISO="true" --mount type=bind,source=./result,target=/create-ks-iso/result --mount type=bind,source=./isosrc,target=/create-ks-iso/isosrc chuckmilam/create-ks-iso:latest
     ```
 
-The `fedora:latest` image is used instead of Red Hat UBI or Alpine because several required packages are not readily available in the traditionally-used lighter images.
+The `fedora:latest` image is used instead of Red Hat UBI or Alpine because several required packages are not readily available in the traditional light images.
 
 ## Roadmap
 Things to implement/improve:
