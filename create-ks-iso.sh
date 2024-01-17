@@ -973,7 +973,9 @@ if [ "$CREATEOEMDRVISO" = "true" ]; then
 fi # End CREATEBOOTISO conditional
 
 # Chown/chmod kickstart files, pasword files, and ssh keys
+echo -e "$0: Setting ownership and permissions on $CREDSDIR"
 chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"
+chmod 700 "$CREDSDIR"
 
 if [ "$WRITEPASSWDS" = "true" ]; then
   echo -e "$0: Setting ownership and permissions of password files"
@@ -981,9 +983,10 @@ if [ "$WRITEPASSWDS" = "true" ]; then
   chmod 600 "$CREDSDIR"/password*.txt
 fi
 
-echo -e "$0: Setting ownership of ssh key files"
-chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"/*.id_rsa "$CREDSDIR"/*.pub
-chmod 700 "$CREDSDIR"
+if [[ -f "$CREDSDIR"/*.id_rsa || -f "$CREDSDIR"/*.pub ]]; then
+  echo -e "$0: Setting ownership of ssh key files"
+  chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"/*.id_rsa "$CREDSDIR"/*.pub
+fi
 
 echo -e "$0: Setting ownership of kickstart file"
 chown "$SUDO_UID":"$SUDO_GID" "$SRCDIR"/"$KSCFGSRCFILE"
