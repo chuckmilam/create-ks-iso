@@ -771,8 +771,6 @@ EOF
 esac
 
 cat <<EOF >> "$SRCDIR"/ks.cfg
-### Randomly-Generated Cred Section
-
 # Set the system's root password (required)
 rootpw --iscrypted $encrypted_password
 
