@@ -981,8 +981,8 @@ if [ "$WRITEPASSWDS" = "true" ]; then
   chmod 600 "$CREDSDIR"/password*.txt
 fi
 
-if [[ -f "$CREDSDIR"/*.id_rsa || -f "$CREDSDIR"/*.pub ]]; then
-  echo -e "$0: Setting ownership of ssh key files"
+if compgen -G "${CREDSDIR}/*id_rsa*" > /dev/null ; then
+  echo -e "$0: Setting ownership of SSH key files"
   chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"/*.id_rsa "$CREDSDIR"/*.pub
 fi
 
