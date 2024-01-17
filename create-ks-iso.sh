@@ -404,7 +404,7 @@ echo "$0: Required files and directory checks passed."
 # Required to create grub bootloader password hashes
 check_dependency grub2-mkpasswd-pbkdf2
 
-# If passwords are not defined, they'll be generated with openssl
+# If passwords are not defined, they'll be generated with openssl, check for openssl
 if [[ -z "$password" || -z "$password_username_01" || -z "$password_username_02" ]] ; then
   check_dependency openssl
 fi
