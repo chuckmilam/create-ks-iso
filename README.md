@@ -141,7 +141,6 @@ Things to implement/improve:
     - [x] Network settings
 - [x] DOCKERFILE for portability and network functionality
     - [ ] Find a RHEL base image that has the needed packages available
-    - [ ] Investigate use of Docker .env file instead of CONFIG_FILE
     - [ ] Docker configuration for network kickstart delivery
 - [ ] Complete CONFIG_FILE template with available variables
 - [x] STIG oscap/anaconda plugin logic based on OS distribution and version
@@ -154,6 +153,7 @@ Things to implement/improve:
 - [ ] Option to write generated SSH keys and passwords into ISO
 - [x] Warning if setting FIPS mode without creating boot ISO
 - [ ] Option to turn off STIG-specific settings for non-STIG use cases
+- [ ] Option to write randomly-generated creds into a vault (post-hook?)
 
 ## History
 The initial script harkens back to when I first started using kickstart. Sometime around 2007-2008, I had to automate the deployment of 200+ Linux workstations where systems had to be securely disk-wiped and redeployed frequently. PXE booting and kickstart were life (and sanity) savers. Later, adding requirements for STIG compliance brought on additional challenges. The increased pace of rapid prototyping and testing helped streamline it further. Now I'm looking to use it for automated pipeline testing in places where containers don't quite make sense.
