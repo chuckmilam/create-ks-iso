@@ -99,6 +99,9 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 # Write plaintext passwords to files
 : "${WRITEPASSWDS:=false}" # Default if not defined
 
+# Write SSH keys to files
+: "${WRITESSHKEYS:=false}" # Default if not defined
+
 ##########################
 # User Account Variables #
 ##########################
@@ -430,8 +433,10 @@ if [ "$KSVALIDATOR_CHECKS" = "true" ] ; then
   check_dependency ksvalidator
 fi
 
-# Create directory for creds if it does not exist
-mkdir -p "$CREDSDIR"
+# Create directory for creds if required and does not exist
+if [ "$WRITEPASSWDS" = "true" ] || [ "$WRITESSHKEYS" = "true" ]; then
+  mkdir -p "$CREDSDIR"
+fi
 
 # Create directory for kickstart file if it does not exist
 mkdir -p "$KSRESULTDIR"
@@ -971,9 +976,11 @@ if [ "$CREATEOEMDRVISO" = "true" ]; then
 fi # End CREATEBOOTISO conditional
 
 # Chown/chmod kickstart files, pasword files, and ssh keys
-echo -e "$0: Setting ownership and permissions on $CREDSDIR"
-chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"
-chmod 700 "$CREDSDIR"
+if [ -d "$CREDSDIR" ]; then
+  echo -e "$0: Setting ownership and permissions on $CREDSDIR"
+  chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"
+  chmod 700 "$CREDSDIR"
+fi
 
 if [ "$WRITEPASSWDS" = "true" ]; then
   echo -e "$0: Setting ownership and permissions of password files"
