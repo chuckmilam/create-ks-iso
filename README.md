@@ -156,7 +156,7 @@ Things to implement/improve:
 - [ ] Option to write randomly-generated creds into a vault (post-hook?)
 
 ## History
-The initial script harkens back to when I first started using kickstart. Sometime around 2007-2008, I had to automate the deployment of 200+ Linux workstations where systems had to be securely disk-wiped and redeployed frequently. PXE booting and kickstart were life (and sanity) savers. Later, adding requirements for STIG compliance brought on additional challenges. The increased pace of rapid prototyping and testing helped streamline it further. Now I'm looking to use it for automated pipeline testing in places where containers don't quite make sense.
+The initial script harkens back to when I first started using kickstart. Faced with the (re)deployment of 200+ Linux workstations that had to be disk-wiped and redeployed frequently, I knew I needed to automate. PXE booting and kickstart were sanity-savers. Later, adding STIG compliance requirements brought additional challenges. Rapid prototyping and testing with virtualization helped streamline it further. Now I'm looking to use it for automated pipeline testing in places where containers don't quite make sense.
 
 ## Acknowledgments
 This project references and acknowledges the following resources:
