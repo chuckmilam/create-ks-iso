@@ -737,6 +737,8 @@ cat <<EOF >> "$SRCDIR"/ks.cfg
 # Initial Setup application starts the first time the system is booted, required
 # when firstboot option is set above. 
 initial-setup
+# Provides 'needs-restarting,' used for post-install check if reboot required
+dnf-utils
 # STIG-required packages:
 # With STIG oscap profile applied, login will fail unless tmux is installed
 tmux
