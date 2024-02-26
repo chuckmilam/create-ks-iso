@@ -77,7 +77,7 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 : "${KSRESULTDIR:=$OUTPUTDIR/ks}" # Default if not defined
 
 # Kickstart file location passed to bootloader when KSINBOOTISO is set
-# Default is on the ISO file, but could be a network locati
+# Default is on the ISO file, but could be a network location
 : "${KSLOCATION:=cdrom:\/ks.cfg}" # Default if not defined
 
 # Temporary mount point for OEM Source Media
@@ -187,7 +187,7 @@ encrypt_random_passwd () {
 generate_ssh_keys () { 
   case $ENABLEFIPS in
   true)
-    ssh-keygen -t ecdsa-sha2-nistp521 -b 521 -N "" -f "$CREDSDIR"/"${1}".id_rsa -q -C "${1} kickstart-generated bootstrapping key" # FIPS-compatible 
+    ssh-keygen -t ecdsa-sha2-nistp521 -b 521 -N "" -f "$CREDSDIR"/"${1}".id_rsa -q -C "${1} kickstart-generated bootstrapping key (FIPS)" # FIPS-compatible
     ;;
   *)
     ssh-keygen -N "" -f "$CREDSDIR"/"${1}".id_rsa -q -C "${1} kickstart-generated bootstrapping key" # Non-FIPS system defaults
