@@ -203,7 +203,7 @@ check_dependency () {
 }
 
 csv_format_options () {
-  IFS=" " read -r -a CSV_ARRAY <<< "$1" # Safer method for exapanding var in array
+  IFS=" " read -r -a CSV_ARRAY <<< "$1" # Safer method for expanding var in array
   # Initialize empty string
   csv_output=""
   # Iterate over each element in the array
@@ -323,7 +323,7 @@ if [ "$USENTP" = "true" ]; then
       timezone_config+=" --ntpservers=$csv_output"
       ;;
     9)
-      IFS=" " read -r -a NTP_ARRAY <<< "$NTP_SERVERS" # Safer method for exapanding var in array
+      IFS=" " read -r -a NTP_ARRAY <<< "$NTP_SERVERS" # Safer method for expanding var in array
         prefix="timesource  --ntp-server "
         for ((i=0; i<${#NTP_ARRAY[@]}; i++)); do
           NTP_ARRAY[i]=$prefix${NTP_ARRAY[$i]}
