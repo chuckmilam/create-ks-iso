@@ -745,17 +745,18 @@ tmux
 # Various package findings are mitigated with the following. Installed here because oscap
 # calls yum to install STIG-required packages, but networking is not yet configured and 
 # Red Hat subscriptions have not yet been registered:
-audispd-plugins
 aide
-dnf-automatic
-libcap-ng-utils
-rsyslog-gnutls
-policycoreutils-python-utils
+audispd-plugins
 chrony
-usbguard
+dnf-automatic
+dnf-utils
 fapolicyd
-rng-tools
+libcap-ng-utils
+policycoreutils-python-utils
 python3
+rng-tools
+rsyslog-gnutls
+usbguard
 %end
 
 ## Bootloader section
