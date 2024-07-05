@@ -8,7 +8,7 @@ create-ks-iso.sh is intended to be a simple, lightweight, dynamic solution to ge
 
 ### The Challenges of RHEL STIG Compliance
 There are two aspects of RHEL STIG compliance efforts that realistically should be addressed at install time: 
-1. Setting Federal Information Processing Standard (FIPS) 140-2 mode
+1. Setting Federal Information Processing Standard (FIPS) 140-2/3 mode
 2. Configuring whole-disk encryption
 
 This project attempts to address both challenges.
