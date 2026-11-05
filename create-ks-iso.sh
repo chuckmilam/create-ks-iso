@@ -66,8 +66,18 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 # File Name for newly-created final ISO file
 : "${NEWISONAME:=$NEWISONAMEPREFIX$OEMSRCISO}" # Default if not defined
 
-# Generated kickstart file name, default location is in $SRCDIR
+# Kickstart source filename, default location is in $SRCDIR (may be an absolute path when reusing)
 : "${KSCFGSRCFILE:=ks.cfg}" # Default if not defined
+
+# Use an existing kickstart file instead of generating one
+: "${USE_EXISTING_KSCFG:=false}" # Default if not defined
+case "$USE_EXISTING_KSCFG" in
+  true|false) ;;
+  *)
+    echo "$0: USE_EXISTING_KSCFG must be true or false. Exiting."
+    exit 1
+    ;;
+esac
 
 # kickstart destination file name
 # Best to not change this, some Red Hat internals look for this specific name
@@ -79,6 +89,29 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 # Kickstart file location passed to bootloader when KSINBOOTISO is set
 # Default is on the ISO file, but could be a network location
 : "${KSLOCATION:=cdrom:\/ks.cfg}" # Default if not defined
+
+# Kickstart file used by ISO creation and validation
+if [ "$USE_EXISTING_KSCFG" = "true" ]; then
+  if [[ "$KSCFGSRCFILE" = /* ]]; then
+    KSFILE="$KSCFGSRCFILE"
+  else
+    KSFILE="$SRCDIR/$KSCFGSRCFILE"
+  fi
+else
+  KSFILE="$SRCDIR/ks.cfg"
+fi
+KSRESULTFILE="$KSRESULTDIR/${KSCFGSRCFILE##*/}"
+
+if [ "$USE_EXISTING_KSCFG" = "true" ]; then
+  if [ "$CREATEBOOTISO" != "true" ] && [ "$CREATEOEMDRVISO" != "true" ]; then
+    echo "$0: USE_EXISTING_KSCFG requires CREATEBOOTISO or CREATEOEMDRVISO to be true. Exiting."
+    exit 1
+  fi
+  if [ ! -f "$KSFILE" ]; then
+    echo "$0: Existing kickstart file $KSFILE not found. Exiting."
+    exit 1
+  fi
+fi
 
 # Temporary mount point for OEM Source Media
 ISOMNTDIR="$SRCDIR/mnt"
@@ -404,16 +437,18 @@ fi
 echo "$0: Required files and directory checks passed."
 
 ### Check for required packages
-# Required to create grub bootloader password hashes
-check_dependency grub2-mkpasswd-pbkdf2
+if [ "$USE_EXISTING_KSCFG" = "false" ]; then
+  # Required to create grub bootloader password hashes
+  check_dependency grub2-mkpasswd-pbkdf2
 
-# If passwords are not defined, they'll be generated with openssl, check for openssl
-if [[ -z "$password" || -z "$password_username_01" || -z "$password_username_02" ]] ; then
-  check_dependency openssl
-fi
+  # If passwords are not defined, they'll be generated with openssl, check for openssl
+  if [[ -z "$password" || -z "$password_username_01" || -z "$password_username_02" ]] ; then
+    check_dependency openssl
+  fi
 
-if [[ -z "$ssh_pub_key_username_01" || -z "$ssh_pub_key_username_02" ]] ; then
-  check_dependency ssh-keygen
+  if [[ -z "$ssh_pub_key_username_01" || -z "$ssh_pub_key_username_02" ]] ; then
+    check_dependency ssh-keygen
+  fi
 fi
 
 # If ISOs are to be created, mkisofs is a dependency
@@ -434,7 +469,7 @@ if [ "$KSVALIDATOR_CHECKS" = "true" ] ; then
 fi
 
 # Create directory for creds if required and does not exist
-if [ "$WRITEPASSWDS" = "true" ] || [ "$WRITESSHKEYS" = "true" ]; then
+if [ "$USE_EXISTING_KSCFG" = "false" ] && { [ "$WRITEPASSWDS" = "true" ] || [ "$WRITESSHKEYS" = "true" ]; }; then
   mkdir -p "$CREDSDIR"
 fi
 
@@ -466,6 +501,7 @@ if [ "$ENABLEFIPS" = "true" ] && [ "$CREATEBOOTISO" = "false" ]; then
   echo -e "$0:"
 fi
 
+if [ "$USE_EXISTING_KSCFG" = "false" ]; then
 ### Password Generation
 
 # If passwords not defined, generate passwords of either $passwd_len or a default 16 characters using openssl
@@ -853,6 +889,10 @@ chmod 000 /crypto_keyfile.bin
 ### Generated with $0 by $USER at $(date)
 EOF
 
+else
+  echo "$0: Using existing kickstart file $KSFILE."
+fi
+
 # Run optional kickstart validator checks
 if [ "$KSVALIDATOR_CHECKS" = "true" ] ; then
   if [ "$OSTYPE" = "RHEL" ] || [ "$KSINBOOTISO" = "CentOS" ]; then
@@ -860,8 +900,8 @@ if [ "$KSVALIDATOR_CHECKS" = "true" ] ; then
     readarray -t ksvalidator_supported_versions < <(ksvalidator -l)
     # If ksvalidator supports our target version, run the checks (Use "RHEL" here regardless if target is CentOS)
     if [[ "${ksvalidator_supported_versions[*]}"  == *"RHEL$MAJOROSVERSION"* ]]; then
-      echo "$0: Validating kickstart file $SRCDIR/ks.cfg with ksvalidator."
-      ksvalidator -v RHEL"$MAJOROSVERSION" "$SRCDIR"/ks.cfg || { echo "$0: ksvalidator checks: FAILED. Exiting."; exit 1; }
+      echo "$0: Validating kickstart file $KSFILE with ksvalidator."
+      ksvalidator -v RHEL"$MAJOROSVERSION" "$KSFILE" || { echo "$0: ksvalidator checks: FAILED. Exiting."; exit 1; }
       echo "$0: ksvalidator checks: PASSED."
     else
       echo "$0: This version of ksvalidator does not support $OSTYPE $MAJOROSVERSION. Exiting."; exit 1
@@ -898,7 +938,7 @@ if [ "$CREATEBOOTISO" = "true" ]; then
     sed -i 's/Install/FIPS mode with kickstart Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
     sed -i 's/Test/FIPS mode with kickstart Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
     # Copy ks.cfg into working dir
-    cp "$SRCDIR"/"$KSCFGSRCFILE" "$WORKDIR"/"$KSCFGDESTFILENAME"
+    cp "$KSFILE" "$WORKDIR"/"$KSCFGDESTFILENAME"
   fi
 
   # No FIPS mode, insert ks.cfg into boot ISO
@@ -914,7 +954,7 @@ if [ "$CREATEBOOTISO" = "true" ]; then
       sed -i 's/Install/kickstart Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
       sed -i 's/Test/kickstart Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
       # Copy ks.cfg into working dir
-      cp "$SRCDIR"/"$KSCFGSRCFILE" "$WORKDIR"/"$KSCFGDESTFILENAME"
+      cp "$KSFILE" "$WORKDIR"/"$KSCFGDESTFILENAME"
   fi
 
   # FIPS mode enabled, do not insert ks.cfg into boot ISO
@@ -971,36 +1011,47 @@ if [ "$CREATEOEMDRVISO" = "true" ]; then
   mkdir -p "$OEMDRVDIR"
   chown "$SUDO_UID":"$SUDO_GID" "$OEMDRVDIR"
   rm -f "$OEMDRVDIR"/"$KSCFGDESTFILENAME" # Remove old ks.cfg
-  cp "$SRCDIR"/"$KSCFGDESTFILENAME" "$OEMDRVDIR"
+  cp "$KSFILE" "$OEMDRVDIR"/"$KSCFGDESTFILENAME"
   mkisofs -quiet -V OEMDRV -o "$ISORESULTDIR"/"$OEMDRVISOFILENAME".iso "$OEMDRVDIR"
   chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR"/"$OEMDRVISOFILENAME".iso
   rm -f "$OEMDRVDIR"/"$KSCFGDESTFILENAME" # Remove ks.cfg
   rm -rf "$OEMDRVDIR"
 fi # End CREATEBOOTISO conditional
 
-# Chown/chmod kickstart files, pasword files, and ssh keys
-if [ -d "$CREDSDIR" ]; then
-  echo -e "$0: Setting ownership and permissions on $CREDSDIR"
-  chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"
-  chmod 700 "$CREDSDIR"
-fi
+if [ "$USE_EXISTING_KSCFG" = "false" ]; then
+  # Chown/chmod kickstart files, password files, and ssh keys
+  if [ -d "$CREDSDIR" ]; then
+    echo -e "$0: Setting ownership and permissions on $CREDSDIR"
+    chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"
+    chmod 700 "$CREDSDIR"
+  fi
 
-if [ "$WRITEPASSWDS" = "true" ]; then
-  echo -e "$0: Setting ownership and permissions of password files"
-  chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"/password*.txt
-  chmod 600 "$CREDSDIR"/password*.txt
-fi
+  if [ "$WRITEPASSWDS" = "true" ]; then
+    echo -e "$0: Setting ownership and permissions of password files"
+    chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"/password*.txt
+    chmod 600 "$CREDSDIR"/password*.txt
+  fi
 
-if compgen -G "${CREDSDIR}/*id_rsa*" > /dev/null ; then
-  echo -e "$0: Setting ownership of SSH key files"
-  chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"/*.id_rsa "$CREDSDIR"/*.pub
-fi
+  if compgen -G "${CREDSDIR}/*id_rsa*" > /dev/null ; then
+    echo -e "$0: Setting ownership of SSH key files"
+    chown "$SUDO_UID":"$SUDO_GID" "$CREDSDIR"/*.id_rsa "$CREDSDIR"/*.pub
+  fi
 
-echo -e "$0: Setting ownership of kickstart file"
-chown "$SUDO_UID":"$SUDO_GID" "$SRCDIR"/"$KSCFGSRCFILE"
-chmod 640 "$SRCDIR"/"$KSCFGSRCFILE"
-echo -e "$0: Moving kickstart file to $KSRESULTDIR"
-mv "$SRCDIR"/"$KSCFGSRCFILE" "$KSRESULTDIR"
+  echo -e "$0: Setting ownership of kickstart file"
+  chown "$SUDO_UID":"$SUDO_GID" "$KSFILE"
+  chmod 640 "$KSFILE"
+  echo -e "$0: Moving kickstart file to $KSRESULTDIR"
+  mv "$KSFILE" "$KSRESULTDIR"/"${KSCFGSRCFILE##*/}"
+else
+  echo -e "$0: Copying existing kickstart file to $KSRESULTDIR"
+  if [[ "$KSFILE" -ef "$KSRESULTFILE" ]]; then
+    echo -e "$0: Existing kickstart file is already in the output directory."
+  else
+    cp "$KSFILE" "$KSRESULTFILE"
+    chown "$SUDO_UID":"$SUDO_GID" "$KSRESULTFILE"
+    chmod 640 "$KSRESULTFILE"
+  fi
+fi
 
 # Let everyone know we're done here
 echo -n "$0: Total run time: "
