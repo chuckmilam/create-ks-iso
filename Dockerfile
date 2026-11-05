@@ -2,7 +2,7 @@ FROM fedora:latest AS basebuild
 
 LABEL net.milams.image.authors="chuck@milams.net"
 
-RUN dnf -y install bash dos2unix genisoimage grub2-tools-minimal isomd5sum openssh openssl syslinux pykickstart
+RUN dnf -y install bash dos2unix genisoimage grub2-tools-minimal isomd5sum mtools openssh openssl pykickstart syslinux xorriso
 
 WORKDIR /create-ks-iso
 

@@ -1,182 +1,237 @@
-# Create kickstart (ISO)
-[![Basic CI Tests using Docker](https://github.com/chuckmilam/create-ks-iso/actions/workflows/create-ks-iso-ci.yml/badge.svg)](https://github.com/chuckmilam/create-ks-iso/actions/workflows/create-ks-iso-ci.yml)
+# Create Kickstart and Installation ISOs
 
-Dynamically creates a kickstart file with optional randomly-generated bootstrap user credentials, useful for STIG compliance testing in an automation pipeline. Includes options for creating custom ISO images to enable non-interactive FIPS-compliant installations of a RHEL-based Linux distributions.
+[![Container-based CI tests](https://github.com/chuckmilam/create-ks-iso/actions/workflows/create-ks-iso-ci.yml/badge.svg)](https://github.com/chuckmilam/create-ks-iso/actions/workflows/create-ks-iso-ci.yml)
 
-## Overview
-create-ks-iso.sh is intended to be a simple, lightweight, dynamic solution to generate a STIG-compliant kickstart file and installer boot ISO image. Optionally, the user can create an OEMDRV ISO for delivering the kickstart file to the system installer; useful in environments where PXE boot or similar network delivery methods may not be available. Bootstrap user credentials may be either randomly-generated or specifically declared as required to fit operational needs. The kickstart file can be tailored at the point of generation. Default settings are easily changed either by editing the included [CONFIG_FILE](CONFIG_FILE) template or by setting environment variables at runtime, potentially allowing for use in automation pipelines.
+`create-ks-iso.sh` generates a RHEL Kickstart configuration and can package it as a separate OEMDRV volume or embed it in a modified, bootable RHEL installation ISO. It is intended for repeatable bootstrap and provisioning workflows, including organizations that need to create their first Linux system from a Windows workstation.
 
-### The Challenges of RHEL STIG Compliance
-There are two aspects of RHEL STIG compliance efforts that realistically should be addressed at install time: 
-1. Setting Federal Information Processing Standard (FIPS) 140-2/3 mode
-2. Configuring whole-disk encryption
+The project provides configurable bootstrap accounts, optional generated credentials, FIPS-related installer boot settings, and LUKS encryption for the LVM physical volume. It is a starting point for provisioning, not a certification that an installed system meets a particular STIG or organizational policy. Review the generated Kickstart, credential handling, and installed system before deployment.
 
-This project attempts to address both challenges.
+A common first-machine workflow is to build the installation media from a Windows workstation using WSL or containers, install a server or VM from that media, then use its bootstrap account to bring it under Ansible or another configuration-management system. Keep the matching credentials for initial access, then rotate or replace them as part of onboarding.
 
-#### FIPS Mode
-While FIPS mode can be enabled after the OS install, it is not the recommended practice and can leave the system in an inconsistent state on first boot when testing for FIPS mode.
+## Choose how to run it
 
-Per the [RHEL 9 Security Hardening Guide](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/security_hardening/assembly_installing-the-system-in-fips-mode_security-hardening#proc_installing-the-system-with-fips-mode-enabled_assembly_installing-the-system-in-fips-mode) (Red Hat login may be required for access):
+| Environment | Suggested approach |
+| --- | --- |
+| Linux workstation | Run the script directly or use Docker/Podman. |
+| Windows workstation without a Linux machine | Use Docker Desktop or WSL 2 with Docker/Podman. WSL is a Linux environment; follow the storage guidance below when building full ISOs. |
+| CI pipeline | Use the container image and provide a licensed RHEL installation ISO when building a boot ISO. |
 
-> Red Hat recommends installing RHEL with FIPS mode enabled, as opposed to enabling FIPS mode later. Enabling FIPS mode during the installation ensures that the system generates all keys with FIPS-approved algorithms and continuous monitoring tests in place.
-
-Anecdotally, inspectors/auditors may ask for proof that the system was installed with FIPS enabled rather than switched on after an install. Therefore, where FIPS mode is required, it is recommended to create the modified boot ISO (set CREATEBOOTISO="true") option here and then use it to install the OS.
-
-#### Whole-Disk Encryption
-The RHEL 8 STIG introduced the *de facto* requirement that [all system partitions are encrypted](https://www.stigviewer.com/stig/red_hat_enterprise_linux_8/2021-06-14/finding/V-230224), unless *"...there is a documented and approved reason for not having data-at-rest encryption...."* 
-
-The RHEL 9 STIG took this a step further, making [data-at-rest encryption a CAT I / HIGH Severity STIG finding](https://www.stigviewer.com/stig/red_hat_enterprise_linux_9/2023-09-13/finding/V-257879). The exception where *"...there is a documented and approved reason for not having data-at-rest encryption, this requirement is Not Applicable."* is still present.
-
-Again, anecdotally, it is easier to comply with the STIG check than try to debate an inspector or auditor over just what *"documented and approved"* means. 
-
-Without a method to provide the encryption key/passphrase to unlock system partitions, the system will hang at boot waiting for the passphrase to be typed in at the console. If each individual partition is encrypted, then a passphrase must be entered for every partition. This project provides a method of "baking in" the keyfile to auto-decrypt the system partitions without the need to set up a clevis/tang environment. By encrypting the LVM physical volume instead of the logical volumes, resize operations can occur while leaving disk encryption in place.
+The container route avoids installing the project dependencies on the host. A full boot ISO still needs a RHEL installation DVD ISO and enough disk space for the source, extracted working files, and output.
 
 ## Requirements
-* A Linux system. RHEL/CentOS, Ubuntu, and WSL have all been tested successfully, but primary focus has been on Red Hat-derived distributions. System should have these packages installed:
-    * bash v4+
-    * genisoimage
-    * git
-    * grub2-tools-minimal
-    * isomd5sum
-    * OpenSSH
-    * OpenSSL
-    * syslinux
-    * pykickstart (for running ksvalidator checks)
-* When creating a custom boot ISO:
-    * RHEL-based full install ISO, readable by the user running the script.
-    * root/sudo permissions in order to mount the ISO image.
-    * Sufficient disk space for ISO creation. Enough is needed for the source OEM install ISO, temporary space for the extracted OEM install ISO, and then the final custom boot ISO. Consider that RHEL 8 and 9 boot ISOs are between 9-12G in size, so plan on at least 3x that size.
 
-There is also a [container-based option](#docker-or-podman-usage) that has been tested with Docker/Podman. This method frees up the need to [chase dependencies](#requirements) on the host system, and it even works on Windows hosts. It's good for chicken/egg problems in Microsoft-first environments or when moving to a new major Linux distribution release version.
+### Native Linux
 
-## Installation
-No installation is required, and this can be run directly from a user home directory on Linux systems.
-To use create-ks-iso, simply clone the GitHub repository:
-```
+For direct script use, install the packages needed by the selected operation:
+
+- Bash 4 or newer, Git, OpenSSH, and OpenSSL
+- `genisoimage`, `grub2-tools-minimal`, `isomd5sum`, and `syslinux` for ISO creation
+- `xorriso` for RHEL 10 and newer custom boot ISOs
+- `mtools` for RHEL 10 and newer custom boot ISOs when enabling FIPS or embedding a Kickstart
+- `pykickstart` when running `ksvalidator` checks
+
+Creating a modified boot ISO also requires a readable RHEL full Installation (Binary DVD) ISO and root privileges to mount it. The DVD ISO includes BaseOS and AppStream for offline installation; the smaller Boot ISO requires access to installation repositories. See [RHEL 10 distribution of content](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/10.0_release_notes/distribution).
+
+### Docker or Podman
+
+The repository includes a container image definition with the required packages. Building a modified boot ISO requires a privileged container so the script can mount the source ISO. Use only a source ISO and container image you trust.
+
+### WSL storage planning
+
+WSL 2 stores its Linux filesystem in an expanding `ext4.vhdx`. Deleting temporary files frees space inside Linux, but the Windows-side VHDX may remain at the larger size it reached during a build. Full ISO builds use substantial temporary space in the container-storage filesystem as well as output space.
+
+For WSL builds:
+
+1. Check both filesystems with `df -h / /mnt/d` (adjust the Windows drive mount as needed).
+2. Put the final ISO output on the Windows filesystem, for example `/mnt/d/ISOs`, by setting `TEST_OUTPUT_BASE` when using the test script or mounting a Windows directory as the container output directory.
+3. Keep generated passwords and private keys in a private Linux-side directory, not in a shared Windows output folder.
+4. Allow at least three times the source ISO size free on the container-storage filesystem, plus the source ISO size and 1 GiB free on the output filesystem. This is a minimum; additional working room is prudent.
+
+To compact a VHDX after cleanup, shut down WSL and compact the distribution's VHDX from Windows. This affects the WSL distribution, so do it only after closing work in all WSL distributions. See Microsoft's guide to [managing WSL disk space](https://learn.microsoft.com/en-us/windows/wsl/disk-space).
+
+## Quick start
+
+Clone the repository and generate a Kickstart:
+
+```bash
 git clone https://github.com/chuckmilam/create-ks-iso
-```
-Once the repository is cloned, change into the project directory and run the script with default settings:
-```
 cd create-ks-iso
 ./create-ks-iso.sh
 ```
-Assuming all dependency checks pass, the default settings will generate a kickstart file (ks.cfg) in the current working directory, as well as some SSH keys in the "creds" directory. 
 
-No ISOs are created unless the default settings are changed.
+By default, this writes `ks.cfg` in the current directory and generated SSH key pairs under `result/creds`. It does not create an installation ISO unless ISO creation is enabled. Review the generated files and protect the credential directory.
+
+The container smoke tests can be run without a RHEL ISO:
+
+```bash
+./test-container-build.sh
+```
+
+To build and validate a modified ISO as well, see [Testing a full boot ISO](#testing-a-full-boot-iso).
 
 ## Usage
-create-ks-iso attempts to be flexible to fit various use cases. Some examples:
 
-### Customize Script Settings
-Variables can be set by editing the [CONFIG_FILE](CONFIG_FILE) directly, or by using environment variables. 
+Set options in [`CONFIG_FILE`](CONFIG_FILE) or pass them as environment variables. The script supports generating a Kickstart, an OEMDRV ISO, a modified boot ISO, or a modified boot ISO with the Kickstart embedded.
 
-### Generate a kickstart file
-To generate a kickstart file, simply run the script:
-```
+### Generate a Kickstart
+
+```bash
 ./create-ks-iso.sh
 ```
-This command will generate a kickstart file in the current directory. Note FIPS mode is not enabled in the generated kickstart file. This may not meet STIG compliance requirements.
 
-### Generate an OEMDRV volume ISO
-This ISO volume allows the kickstart file to be detected and run by the system installer with no manual intervention required. In the most common cases, the system install ISO is attached to the machine in the first CD/DVD drive. 
-```Shell
-CREATEOEMDRVISO="true" ./create-ks-iso.sh
-```
-Attach this OEMDRV ISO to the machine to be installed in a second CD/DVD drive and boot from the first CD/DVD drive. It should load and run the kickstart install automatically.
+FIPS mode is disabled by default. Setting `ENABLEFIPS=true` changes generated Kickstart and boot ISO settings; install-time FIPS requires booting the installer with `fips=1`.
 
-### Generate a Custom RHEL Boot ISO with FIPS mode enabled
-For this option, a RHEL-based full install ISO, readable by the user running the script, must be available. Default location for this install ISO is `$SRCDIR/isosrc`, but can be controlled by the `ISOSRCDIR` variable.
+### Create a separate OEMDRV ISO
 
-Note the use of `sudo -E` to ensure the environment variables are passed into the sudo session.
-```Shell
-CREATEBOOTISO="true" ENABLEFIPS="true" sudo -E ./create-ks-iso.sh
+An OEMDRV ISO contains the Kickstart and can be attached alongside the RHEL installation ISO:
+
+```bash
+CREATEOEMDRVISO=true ./create-ks-iso.sh
 ```
 
-### Generate a Custom RHEL Boot ISO with FIPS mode enabled with ks.cfg built-in
-This option bakes the kickstart file directly into the boot ISO, useful for systems limited to only a single bootable drive for the ISO image.
+Boot the machine from the installation ISO with the OEMDRV volume attached. Verify that your target installer release detects and uses the Kickstart as expected.
 
-Again, a RHEL-based install ISO is required as above, and note the use of `sudo -E` to ensure the environment variables are passed into the sudo session.
-```Shell
-CREATEBOOTISO="true" KSINBOOTISO="true" ENABLEFIPS="true" sudo -E ./create-ks-iso.sh
+### Create a modified boot ISO
+
+Place a RHEL full Installation ISO in `$SRCDIR/isosrc` (or set `ISOSRCDIR`), then run the script with permission to mount the source ISO:
+
+```bash
+CREATEBOOTISO=true ENABLEFIPS=true sudo -E ./create-ks-iso.sh
 ```
 
-### Build a Custom ISO using an existing kickstart file
-To rebuild an ISO without regenerating or modifying your kickstart file, set `USE_EXISTING_KSCFG="true"`. By default, the script looks for `ks.cfg` in `SRCDIR`; set `KSCFGSRCFILE` to a different filename or a path relative to `SRCDIR` (or provide an absolute path). The source file is preserved, and a copy is placed in the output directory unless it is already there. This mode skips generated credentials and requires `CREATEBOOTISO` or `CREATEOEMDRVISO` to be enabled.
+Use the embedded-Kickstart option when only one ISO can be attached:
 
-For example, to embed an existing `ks.cfg` in a FIPS-enabled boot ISO:
-```Shell
-USE_EXISTING_KSCFG="true" KSCFGSRCFILE="ks.cfg" CREATEBOOTISO="true" KSINBOOTISO="true" ENABLEFIPS="true" sudo -E ./create-ks-iso.sh
+```bash
+CREATEBOOTISO=true KSINBOOTISO=true ENABLEFIPS=true \
+  sudo -E ./create-ks-iso.sh
 ```
 
-`ENABLEFIPS` updates the boot ISO's bootloader options; it does not change the supplied kickstart. Ensure the existing kickstart already contains the settings required for the intended FIPS installation. The source installation ISO and root privileges are still required.
+`sudo -E` preserves the selected environment variables. The bootloader entry on a FIPS-enabled modified ISO includes `fips=1`; the Kickstart separately configures the installed system. RHEL 10 and newer use `xorriso` to preserve the source ISO's GRUB and hybrid boot metadata.
 
-### Sanitize the working directories
-Run the sanitize script to remove any generated user credentials, kickstart, and ISO files.
-```Shell
+### Use an existing Kickstart
+
+To build an ISO without regenerating the Kickstart, set `USE_EXISTING_KSCFG=true`. By default, the script reads `ks.cfg` from `SRCDIR`; set `KSCFGSRCFILE` to another filename or path. The source file is preserved and copied to the output directory.
+
+```bash
+USE_EXISTING_KSCFG=true KSCFGSRCFILE=ks.cfg \
+  CREATEBOOTISO=true KSINBOOTISO=true ENABLEFIPS=true \
+  sudo -E ./create-ks-iso.sh
+```
+
+This mode requires either `CREATEBOOTISO` or `CREATEOEMDRVISO`. `ENABLEFIPS` changes boot ISO settings, not the supplied Kickstart; ensure the existing file contains the settings required for the intended installation.
+
+### Credentials and sensitive files
+
+Random passwords are used by default. Generated SSH key pairs are written to `CREDSDIR` (by default, `$OUTPUTDIR/creds`). Plaintext password files are not written unless `WRITEPASSWDS=true` is set. Those files include the root, bootstrap-user, and GRUB passwords. Use plaintext output only when needed for testing or initial access, store it somewhere private, and remove or rotate it after use.
+
+The generated credentials are not embedded into the boot ISO. Keep the matching credential files from the same build if you need to log in to the installed system. When using a container, mount a private Linux-side directory for `CREDSDIR` and a separate output directory for the ISO.
+
+### Clean generated files
+
+Run the sanitizer to remove generated credentials, Kickstart, and ISO files:
+
+```bash
 ./sanitize-create-ks-iso.sh
 ```
-Be sure to specify the same configuration/environment variables if any were used to change default path names in the initial run of `create-ks-iso.sh`.
 
-### Docker or Podman Usage
-This has been tested on Linux and Windows docker hosts, and is still under development. 
+Use the same path-related configuration and environment variables as the original run. The sanitizer operates on the project's configured output locations; it does not securely erase files or shrink a WSL VHDX.
 
-To get started, from the git cloned directory (example below uses docker, but podman should be a drop-in replacement for this use case):
+## Container usage
 
-1. Create a local ISO source directory where your OEM install ISO will reside. Default name is: "isosrc."
-2. Create a local directory for the generated files. Default name is: "result."
-3. Build the image:
-    ```
-    docker build -t chuckmilam/create-ks-iso:latest .
-    ```
-4. Then run the container. You can pass environment variables similar to running on a native Linux host, but we do pass the USER variable in to the container so it won't be NULL. *The example below is shown using a Windows Docker host.* Note the required use of the `--privileged` switch when building the boot iso, to allow mount of the ISO file system in the build script.
-    ```
-    docker run --privileged --env USER=${Env:UserName} --env WRITEPASSWDS="true" --env CREATEBOOTISO="true" --env ENABLEFIPS="true" --env KSINBOOTISO="true" --env password="Password1234" --env CREATEOEMDRVISO="true" --mount type=bind,source=${PWD}\result,target=/create-ks-iso/result --mount type=bind,source=${PWD}\isosrc,target=/create-ks-iso/isosrc chuckmilam/create-ks-iso:latest
-    ```
+Build the image from the cloned repository:
 
-    Here is the Linux version of the above. The only change is the Linux vs. Windows directory path syntax:
+```bash
+podman build -t create-ks-iso .
+```
 
-    ```
-    docker run --privileged --env USER=${USER} --env WRITEPASSWDS="true" --env CREATEBOOTISO="true" --env ENABLEFIPS="true" --env KSINBOOTISO="true" --env password="Password1234" --env CREATEOEMDRVISO="true" --mount type=bind,source=./result,target=/create-ks-iso/result --mount type=bind,source=./isosrc,target=/create-ks-iso/isosrc chuckmilam/create-ks-iso:latest
-    ```
+For a full boot ISO build, mount the source ISO directory read-only and an output directory writable. With Podman, use `--privileged` for ISO mounting. This WSL/Linux example writes the ISO to the Windows `D:` drive:
 
-The `fedora:latest` image is used instead of Red Hat UBI or Alpine because several required packages are not readily available in the traditional light images.
+```bash
+mkdir -p /mnt/d/ISOs/create-ks-iso-output
+mkdir -m 700 -p "$HOME/create-ks-iso-creds"
+
+sudo podman run --rm --privileged \
+  --volume /mnt/d/ISOs:/create-ks-iso/isosrc:ro,Z \
+  --volume /mnt/d/ISOs/create-ks-iso-output:/create-ks-iso/result:Z \
+  --volume "$HOME/create-ks-iso-creds:/create-ks-iso/creds:Z" \
+  --env SUDO_UID="$(id -u)" \
+  --env SUDO_GID="$(id -g)" \
+  --env OEMSRCISO=rhel-10.2-x86_64-dvd.iso \
+  --env CREATEBOOTISO=true \
+  --env KSINBOOTISO=true \
+  --env ENABLEFIPS=true \
+  --env CREDSDIR=/create-ks-iso/creds \
+  --env WRITEPASSWDS=true \
+  create-ks-iso
+```
+
+Replace the example source ISO name with a file in `/mnt/d/ISOs`. If credentials are not needed, omit `WRITEPASSWDS=true`; generated SSH keys are still placed in the mounted credentials directory. Docker uses the same mounts and environment variables; use the corresponding Docker commands and ensure the engine permits privileged ISO mounting.
+
+## Testing
+
+### Container smoke tests
+
+Run the image build, Kickstart validation, and OEMDRV ISO content checks:
+
+```bash
+./test-container-build.sh
+```
+
+### Testing a full boot ISO
+
+Provide a licensed RHEL installation ISO. On a host using rootless Podman, use rootful Podman for the source ISO mount:
+
+```bash
+CONTAINER_ENGINE=podman \
+CONTAINER_ENGINE_SUDO=true \
+RHEL_SOURCE_ISO=/path/to/rhel-10.2-x86_64-dvd.iso \
+./test-container-build.sh
+```
+
+The script writes results to a unique directory under `$HOME` by default. Choose another existing disk-backed output directory with `TEST_OUTPUT_BASE`. For WSL, direct the ISO output to the Windows filesystem, for example:
+
+```bash
+CONTAINER_ENGINE=podman \
+CONTAINER_ENGINE_SUDO=true \
+RHEL_SOURCE_ISO=/mnt/d/ISOs/rhel-10.2-x86_64-dvd.iso \
+TEST_OUTPUT_BASE=/mnt/d/ISOs \
+./test-container-build.sh
+```
+
+Full builds need at least three times the source ISO size free on `/` for container work files and the source ISO size plus 1 GiB free on the output filesystem. The script checks those locations; if your container engine stores images elsewhere, check that filesystem too. It rejects `/tmp`-style `tmpfs`/`ramfs` output, validates the generated Kickstart and OEMDRV ISO, then verifies the boot ISO checksum and embedded `ks.cfg`. The generated output is retained at the printed path; remove it after testing if it is not needed. CI runs only the container smoke tests and does not require a licensed RHEL ISO.
+
+The test script defaults to not writing plaintext passwords. If you set `WRITEPASSWDS=true`, the generated password files are retained in the test output's `creds/` directory. Do not direct that output to a shared Windows folder if the credentials need to remain private; use the container workflow's separate `CREDSDIR` mount instead.
+
+The RHEL 10.2 build path has been exercised against a DVD ISO: its generated Kickstart passed `ksvalidator`, and the modified ISO passed checksum and embedded-file checks. RHEL 8.8 and 9.3 images have also passed build and content validation. Booting an installer and completing an installation are separate checks and should be tested in a VM or on hardware before deployment.
+
+## FIPS and encryption notes
+
+FIPS behavior varies by RHEL release. For install-time FIPS, the installer must boot with the `fips=1` kernel argument; adding it only to the installed system's bootloader configuration is not equivalent. Red Hat recommends enabling FIPS during installation for RHEL 8 and 9. For RHEL 10, FIPS must be enabled during installation and post-installation switching is unsupported. Consult the current [RHEL 8](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/8/html/security_hardening/switching-rhel-to-fips-mode_security-hardening), [RHEL 9](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/security_hardening/switching-rhel-to-fips-mode_security-hardening), and [RHEL 10](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/security_hardening/switching-rhel-to-fips-mode) Security Hardening Guides and the applicable STIG.
+
+Applicable RHEL STIGs include requirements for protecting data at rest; criteria vary by STIG release. This project encrypts the LVM physical volume and configures a keyfile for automatic unlocking. Review the generated Kickstart and installed system against the current STIG and organization policy. The project does not itself certify a system as compliant.
 
 ## Roadmap
-Things to implement/improve:
-- [x] Move ks.cfg into its own subdir under result
-- [x] Modify /etc/issue message to include username
-- [x] Replace soon-to-be-deprecated python `crypt` module in `encrypt_random_passwd` function.
-- [x] Make configurable as variables in ks.cfg:
-    - [x] Disk partition sizes
-    - [x] NTP configuration
-    - [x] Network settings
-- [x] DOCKERFILE for portability and network functionality
-    - [ ] Find a RHEL base image that has the needed packages available
-    - [ ] Docker configuration for network kickstart delivery
-- [ ] Complete CONFIG_FILE template with available variables
-- [x] STIG oscap/anaconda plugin logic based on OS distribution and version
-- [x] Checks for required packages for ISO creation
-- [x] ksvalidator checks
-- [x] Change ntpserver kickstart statement per major OS version (8.x vs 9.x)
-- [ ] Utilize "light" installer ISO for network-based installs
-- [x] Option to create FIPS-enabled boot ISO without baked-in kickstart file
-- [ ] Option to specify a different kickstart location (HTTP/S, NFS, etc.)
-- [ ] Option to write generated SSH keys and passwords into ISO
-- [x] Warning if setting FIPS mode without creating boot ISO
-- [ ] Option to turn off STIG-specific settings for non-STIG use cases
-- [ ] Option to write randomly-generated creds into a vault (post-hook?)
+
+- [x] Generate Kickstart files and OEMDRV/boot ISOs
+- [x] Support install-time FIPS boot options and embedded Kickstart
+- [x] Run Kickstart validation and container smoke tests in CI
+- [ ] Support network-hosted Kickstart delivery
+- [ ] Add network-based installation using a smaller installer ISO
+- [ ] Add a configuration option for non-STIG use cases
+- [ ] Store generated credentials in a secrets vault or post-install workflow
 
 ## History
-The initial script harkens back to when I first started using kickstart. Faced with the (re)deployment of 200+ Linux workstations that had to be disk-wiped and redeployed frequently, I knew I needed to automate. PXE booting and kickstart were sanity-savers. Later, adding STIG compliance requirements brought additional challenges. Rapid prototyping and testing with virtualization helped streamline it further. Now I'm looking to use it for automated pipeline testing in places where containers don't quite make sense.
+
+The project began as a way to automate repeat deployments of Linux workstations. PXE booting and Kickstart helped scale those deployments; later STIG requirements added install-time FIPS and disk-encryption considerations. The project now also supports containerized and CI-based testing for environments where a dedicated Linux build machine may not be available.
 
 ## Acknowledgments
-This project references and acknowledges the following resources:
-* [How to create a modified Red Hat Enterprise Linux ISO with kickstart file or modified installation media](https://access.redhat.com/solutions/60959)
-* [How to generate a SHA-2 (sha256 or sha512) hashed password compatible with /etc/shadow](https://access.redhat.com/solutions/221403)
-* [Appendix B. Kickstart commands and options reference](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/performing_an_advanced_rhel_9_installation/kickstart-commands-and-options-reference_installing-rhel-as-an-experienced-user)
-* [How to configure a keyfile in kickstart](https://access.redhat.com/solutions/4349431)
-* [Configuring manual enrollment of LUKS-encrypted volumes using a TPM 2.0 policy](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/security_hardening/configuring-automated-unlocking-of-encrypted-volumes-using-policy-based-decryption_security-hardening#configuring-manual-enrollment-of-volumes-using-tpm2_configuring-automated-unlocking-of-encrypted-volumes-using-policy-based-decryption)
-* [Making a Kickstart file available on a local volume for automatic loading](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/performing_an_advanced_rhel_9_installation/making-kickstart-files-available-to-the-installation-program_installing-rhel-as-an-experienced-user#making-a-kickstart-file-available-on-a-local-volume-for-automatic-loading_making-kickstart-files-available-to-the-installation-program)
-* [How to dynamically add the network parameters into kickstart using %pre script parsed from anaconda command line?](https://access.redhat.com/solutions/2973831)
-* [DVD embedded Kickstart for RHEL 7 utilizing SCAP Security Guide (SSG) as a hardening script.](https://github.com/RedHatGov/ssg-el7-kickstart/blob/master/createiso.sh)
-* [The ShellCheck plugin for Visual Studio Code](https://github.com/vscode-shellcheck/vscode-shellcheck)
+
+- [How to create a modified Red Hat Enterprise Linux ISO with kickstart file or modified installation media](https://access.redhat.com/solutions/60959)
+- [How to generate a SHA-2 hashed password compatible with `/etc/shadow`](https://access.redhat.com/solutions/221403)
+- [Kickstart commands and options reference](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/performing_an_advanced_rhel_9_installation/kickstart-commands-and-options-reference_installing-rhel-as-an-experienced-user)
+- [How to configure a keyfile in Kickstart](https://access.redhat.com/solutions/4349431)
+- [Configuring manual enrollment of LUKS-encrypted volumes using a TPM 2.0 policy](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/security_hardening/configuring-automated-unlocking-of-encrypted-volumes-using-policy-based-decryption_security-hardening#configuring-manual-enrollment-of-volumes-using-tpm2_configuring-automated-unlocking-of-encrypted-volumes-using-policy-based-decryption)
+- [Making a Kickstart file available on a local volume](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/performing_an_advanced_rhel_9_installation/making-kickstart-files-available-to-the-installation-program_installing-rhel-as-an-experienced-user#making-a-kickstart-file-available-on-a-local-volume-for-automatic-loading_making-kickstart-files-available-to-the-installation-program)
+- [Dynamically adding network parameters to Kickstart](https://access.redhat.com/solutions/2973831)
+- [DVD-embedded Kickstart for RHEL 7 using SCAP Security Guide](https://github.com/RedHatGov/ssg-el7-kickstart/blob/master/createiso.sh)
+- [ShellCheck](https://github.com/koalaman/shellcheck)
