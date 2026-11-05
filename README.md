@@ -99,6 +99,17 @@ Again, a RHEL-based install ISO is required as above, and note the use of `sudo 
 ```Shell
 CREATEBOOTISO="true" KSINBOOTISO="true" ENABLEFIPS="true" sudo -E ./create-ks-iso.sh
 ```
+
+### Build a Custom ISO using an existing kickstart file
+To rebuild an ISO without regenerating or modifying your kickstart file, set `USE_EXISTING_KSCFG="true"`. By default, the script looks for `ks.cfg` in `SRCDIR`; set `KSCFGSRCFILE` to a different filename or a path relative to `SRCDIR` (or provide an absolute path). The source file is preserved, and a copy is placed in the output directory unless it is already there. This mode skips generated credentials and requires `CREATEBOOTISO` or `CREATEOEMDRVISO` to be enabled.
+
+For example, to embed an existing `ks.cfg` in a FIPS-enabled boot ISO:
+```Shell
+USE_EXISTING_KSCFG="true" KSCFGSRCFILE="ks.cfg" CREATEBOOTISO="true" KSINBOOTISO="true" ENABLEFIPS="true" sudo -E ./create-ks-iso.sh
+```
+
+`ENABLEFIPS` updates the boot ISO's bootloader options; it does not change the supplied kickstart. Ensure the existing kickstart already contains the settings required for the intended FIPS installation. The source installation ISO and root privileges are still required.
+
 ### Sanitize the working directories
 Run the sanitize script to remove any generated user credentials, kickstart, and ISO files.
 ```Shell
