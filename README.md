@@ -81,6 +81,8 @@ Set options in [`CONFIG_FILE`](CONFIG_FILE) or pass them as environment variable
 
 FIPS mode is disabled by default. Setting `ENABLEFIPS=true` changes generated Kickstart and boot ISO settings; install-time FIPS requires booting the installer with `fips=1`.
 
+The optional `FIRSTBOOT=true` installer prompt uses the `initial-setup` package and is supported for RHEL 8 and 9. RHEL 10 installation media does not include that package, so the script rejects this option for RHEL 10 and newer.
+
 ### Create a separate OEMDRV ISO
 
 An OEMDRV ISO contains the Kickstart and can be attached alongside the RHEL installation ISO:

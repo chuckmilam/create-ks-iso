@@ -366,6 +366,11 @@ if [[ "$CREATEBOOTISO" = "true" || -n "$OEMSRCISO" ]]; then
   fi
 fi
 
+if [[ "$FIRSTBOOT" = "true" && "$MAJOROSVERSION" -ge 10 ]]; then
+  echo "$0: FIRSTBOOT=true is not supported for RHEL $MAJOROSVERSION because initial-setup is unavailable." >&2
+  exit 1
+fi
+
 ## Set prefixes on new boot ISO file dynamically if not defined
 if [ "$CREATEBOOTISO" = "true" ]; then
   if [ -z "$NEWISONAMEPREFIX" ]; then
@@ -882,9 +887,16 @@ cat <<EOF >> "$SRCDIR"/ks.cfg
 # If more environments are specified, only the last specified environment is used.
 # Define a minimal system environment
 @^minimal-environment
-# Initial Setup application starts the first time the system is booted, required
-# when firstboot option is set above. 
+EOF
+
+if [ "$FIRSTBOOT" = "true" ]; then
+cat <<EOF >> "$SRCDIR"/ks.cfg
+# Initial Setup application starts the first time the system is booted.
 initial-setup
+EOF
+fi
+
+cat <<EOF >> "$SRCDIR"/ks.cfg
 # Provides 'needs-restarting,' used for post-install check if reboot required
 dnf-utils
 # STIG-required packages:

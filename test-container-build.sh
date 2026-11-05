@@ -106,13 +106,42 @@ run_engine build --tag "$IMAGE_NAME" "$SCRIPT_DIR"
 
 run_engine run --rm \
   --env OSTYPE=RHEL \
-  --env MAJOROSVERSION=9 \
+  --env MAJOROSVERSION=10 \
   --env KSVALIDATOR_CHECKS=true \
   --env KS_HOSTNAME=iso-build-test \
   --entrypoint bash "$IMAGE_NAME" \
   -euo pipefail -c '
     /create-ks-iso/create-ks-iso.sh
     test -s /create-ks-iso/result/ks/ks.cfg
+    ! grep -Fxq "firstboot --enabled" /create-ks-iso/result/ks/ks.cfg
+    ! grep -Fxq "initial-setup" /create-ks-iso/result/ks/ks.cfg
+  '
+
+run_engine run --rm \
+  --env OSTYPE=RHEL \
+  --env MAJOROSVERSION=10 \
+  --env FIRSTBOOT=true \
+  --entrypoint bash "$IMAGE_NAME" \
+  -euo pipefail -c '
+    if output=$(/create-ks-iso/create-ks-iso.sh 2>&1); then
+      echo "Expected RHEL 10 FIRSTBOOT validation to fail." >&2
+      exit 1
+    fi
+    grep -Fq "FIRSTBOOT=true is not supported for RHEL 10" <<< "$output"
+  '
+
+run_engine run --rm \
+  --env OSTYPE=RHEL \
+  --env MAJOROSVERSION=9 \
+  --env FIRSTBOOT=true \
+  --env KSVALIDATOR_CHECKS=true \
+  --env KS_HOSTNAME=iso-build-test \
+  --entrypoint bash "$IMAGE_NAME" \
+  -euo pipefail -c '
+    /create-ks-iso/create-ks-iso.sh
+    test -s /create-ks-iso/result/ks/ks.cfg
+    grep -Fxq "firstboot --enabled" /create-ks-iso/result/ks/ks.cfg
+    grep -Fxq "initial-setup" /create-ks-iso/result/ks/ks.cfg
   '
 
 "$CONTAINER_ENGINE" run --rm \
