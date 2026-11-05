@@ -196,7 +196,7 @@
 # Optional space-separated DNS server addresses for a static IP configuration.
 #DNS_SERVERS=""
 
-# Enable the installer firstboot prompt.
+# Enable the installer firstboot prompt (RHEL 8/9 only; requires initial-setup).
 #FIRSTBOOT="false"
 
 # Apply the OpenSCAP STIG addon when supported for the selected OS.
