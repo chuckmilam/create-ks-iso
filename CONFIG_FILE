@@ -1,33 +1,209 @@
 #!/usr/bin/env bash
 
-# Source files for implantation into new ISO (ks.cfg, etc.)
-# This needs to be an absolute path, not a relative path.
-# Also serves as the base for all relative paths defined below.
-# Default is pwd 
+############################
+# Operating System Settings
+############################
+
+# Default OS name; detected from the source ISO label when creating a boot ISO.
+#OSTYPE="RHEL"
+
+# Major OS version; detected from the source ISO label when creating a boot ISO.
+#MAJOROSVERSION="9"
+
+##########################
+# Source and Output Paths
+##########################
+
+# Base directory for source files and relative paths; defaults to the current directory.
+# Set SRCDIR in the environment before running if CONFIG_FILE is not under the current directory.
 #SRCDIR=""
 
-# Source Media ISO Location
-# ISOSRCDIR=""
+# Directory for generated files; defaults to "$SRCDIR/result".
+#OUTPUTDIR=""
 
-# OEM Source Media File Name
-#OEMSRCISO="rhel-8.7-x86_64-dvd.iso"
+# Directory containing the source installation ISO; defaults to "$SRCDIR/isosrc".
+#ISOSRCDIR=""
 
-# Create new full boot ISO
-#CREATEBOOTISO="true"
+# Name of the source installation ISO in ISOSRCDIR.
+#OEMSRCISO="rhel-9-x86_64-dvd.iso"
 
-# Create OEMDRV volume ISO
-#CREATEOEMDRVISO="true"
+# Directory for generated ISO files; defaults to "$OUTPUTDIR/iso".
+#ISORESULTDIR=""
 
-# FIPS Mode
-#ENABLEFIPS="true"
+# Directory for generated kickstart output; defaults to "$OUTPUTDIR/ks".
+#KSRESULTDIR=""
 
-# Write plaintext passwords to files
-# Generally uneeded, but useful for console testing.
-# NOT Recommended to write plaintext passwords out.
-# WRITEPASSWDS="false"
+# Source kickstart filename in SRCDIR.
+#KSCFGSRCFILE="ks.cfg"
 
-# Root password - Specify a password in plain text.
-# Generally uneeded, but useful for console testing.
-# NOT Recommended to write plaintext passwords out.
+# Kickstart filename inside generated media; Red Hat tooling expects "ks.cfg".
+#KSCFGDESTFILENAME="ks.cfg"
+
+# Kickstart location passed to the bootloader when KSINBOOTISO is enabled.
+#KSLOCATION="cdrom:\/ks.cfg"
+
+#####################
+# ISO Creation Options
+#####################
+
+# Build a modified, bootable installation ISO; requires root privileges.
+#CREATEBOOTISO="false"
+
+# Put the kickstart file directly on the boot ISO.
+#KSINBOOTISO="false"
+
+# Create a separate OEMDRV volume ISO containing the kickstart file.
+#CREATEOEMDRVISO="false"
+
+# Prefix added to the generated ISO filename; inferred from enabled options if empty.
+#NEWISONAMEPREFIX=""
+
+# Final generated ISO filename; defaults to NEWISONAMEPREFIX followed by OEMSRCISO.
+#NEWISONAME=""
+
+# Directory used temporarily to stage the OEMDRV ISO; defaults to "$OUTPUTDIR/oemdrv".
+#OEMDRVDIR=""
+
+# Base filename for the generated OEMDRV ISO (the .iso extension is added).
+#OEMDRVISOFILENAME="OEMDRV"
+
+# Enable FIPS-related boot and kickstart settings.
+#ENABLEFIPS="false"
+
+###########################
+# Credential File Settings
+###########################
+
+# Directory for generated credential files; defaults to "$OUTPUTDIR/creds".
+#CREDSDIR=""
+
+# Write generated plaintext passwords to files. Not recommended outside testing.
+#WRITEPASSWDS="false"
+
+# Write generated SSH key pairs to CREDSDIR.
+#WRITESSHKEYS="false"
+
+# Password length for randomly generated passwords.
+#passwd_len="16"
+
+# Root password in plaintext; leave unset to generate a random password.
 #password=""
 
+# Password for the first bootstrap account; leave unset to generate one.
+#password_username_01=""
+
+# Password for the second bootstrap account; leave unset to generate one.
+#password_username_02=""
+
+# GRUB bootloader password in plaintext; leave unset to generate one.
+#grub2_passwd=""
+
+# Existing SSH public key for the first bootstrap account; unset to generate a key pair.
+#ssh_pub_key_username_01=""
+
+# Existing SSH public key for the second bootstrap account; unset to generate a key pair.
+#ssh_pub_key_username_02=""
+
+######################
+# Bootstrap User Accounts
+######################
+
+# Login name for the Ansible service account.
+#username_01="svc.ansible"
+
+# Display/comment field for the Ansible service account.
+#username_01_gecos="Ansible Service Account"
+
+# Numeric user ID for the Ansible service account.
+#username_01_uid="5001"
+
+# Numeric primary group ID for the Ansible service account.
+#username_01_gid="5001"
+
+# Login name for the emergency administrator account.
+#username_02="alt.admin"
+
+# Display/comment field for the emergency administrator account.
+#username_02_gecos="Emergency Admin Account"
+
+# Numeric user ID for the emergency administrator account.
+#username_02_uid="5002"
+
+# Numeric primary group ID for the emergency administrator account.
+#username_02_gid="5002"
+
+#######################
+# Kickstart Settings
+#######################
+
+# Root logical volume size in MiB.
+#LOGVOLSIZEROOT="4096"
+
+# /tmp logical volume size in MiB.
+#LOGVOLSIZETMP="2048"
+
+# /home logical volume size in MiB.
+#LOGVOLSIZEHOME="2048"
+
+# /var logical volume size in MiB.
+#LOGVOLSIZEVAR="8092"
+
+# /var/log logical volume size in MiB.
+#LOGVOLSIZEVARLOG="2048"
+
+# /var/tmp logical volume size in MiB.
+#LOGVOLSIZEVARTMP="2048"
+
+# /var/log/audit logical volume size in MiB.
+#LOGVOLSIZEVARLOGAUDIT="10240"
+
+# /opt logical volume size in MiB.
+#LOGVOLSIZEOPT="8192"
+
+# Swap size mode/value passed to the kickstart logvol command (default: recommended).
+#LOGVOLSIZESWAP="recommended"
+
+# Timezone name used by the kickstart timezone command.
+#TIMEZONE="America/Chicago"
+
+# Tell the system to use UTC for the hardware clock.
+#HWCLOCKUTC="true"
+
+# Configure NTP servers during installation.
+#USENTP="true"
+
+# Space-separated NTP server hostnames.
+#NTP_SERVERS="0.us.pool.ntp.org 1.us.pool.ntp.org 2.us.pool.ntp.org 3.us.pool.ntp.org"
+
+# Activate network devices on system boot.
+#NETWORK_ONBOOT="true"
+
+# Allow IPv6 when using DHCP; false adds the kickstart --noipv6 option.
+#USEIPV6="false"
+
+# Set an optional system hostname; a fully qualified name is accepted.
+#KS_HOSTNAME=""
+
+# Optional static IP address; leave unset to use DHCP.
+#IPADDR=""
+
+# Required subnet mask when IPADDR is set.
+#NETMASK=""
+
+# Optional default gateway for a static IP configuration.
+#GATEWAY=""
+
+# Optional space-separated DNS server addresses for a static IP configuration.
+#DNS_SERVERS=""
+
+# Enable the installer firstboot prompt.
+#FIRSTBOOT="false"
+
+# Apply the OpenSCAP STIG addon when supported for the selected OS.
+#APPLYOPENSCAPSTIG="false"
+
+# Run ksvalidator against the generated kickstart file when available.
+#KSVALIDATOR_CHECKS="false"
+
+# Print additional source ISO metadata for troubleshooting.
+#DEBUG="false"
