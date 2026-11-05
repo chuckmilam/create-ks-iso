@@ -17,26 +17,6 @@ jobs:
         runs-on: ubuntu-latest
         steps:
         - uses: actions/checkout@v3
-        - name: Build the Docker image
-          run: docker build . --file Dockerfile --platform linux/amd64 --tag create-ks-iso
-        - run: echo "Docker build status ${{ job.status }}."
-        - name: Run create-ks-iso script defaults (no config vars set)
-          run: >
-            docker run --privileged create-ks-iso
-        - name: Run create-ks-iso script with ksvalidator checks enabled and test configuration values
-          run: >
-            docker run --privileged --env HOSTNAME --env OSTYPE --env MAJOROSVERSION --env IPADDR --env NETMASK 
-            --env GATEWAY --env DNS_SERVERS --env USENTP --env KSVALIDATOR_CHECKS create-ks-iso
-          env:
-            KS_HOSTNAME: STIG-RHELv8 
-            IPADDR: 192.168.1.2
-            NETMASK: 255.255.255.0 
-            GATEWAY: 192.168.1.1
-            DNS_SERVERS: 192.168.1.1 8.8.8.8 8.8.4.4
-            ENABLEFIPS: true
-            OSTYPE: RHEL
-            MAJOROSVERSION: 8
-            USENTP: true
-            KSVALIDATOR_CHECKS: true
-
+        - name: Build and smoke-test the container image
+          run: CONTAINER_ENGINE=docker ./test-container-build.sh
 

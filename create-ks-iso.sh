@@ -30,6 +30,10 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 # Source CONFIG_FILE for variables
 . "$SRCDIR"/CONFIG_FILE
 
+# Preserve the original caller's ownership when run through sudo; use the current user otherwise.
+: "${SUDO_UID:=$(id -u)}"
+: "${SUDO_GID:=$(id -g)}"
+
 # Output directory name
 : "${OUTPUTDIR:=$SRCDIR/result}" # Default if not defined
 
@@ -124,6 +128,70 @@ SCRATCHISONAME="NEWISO.iso"
 SCRATCHDIR="$SRCDIR/tmp"
 WORKDIRNAME="iso-workdir"
 WORKDIR=$SCRATCHDIR/$WORKDIRNAME
+
+ISO_MOUNTED=false
+ISOMNTDIR_CREATED=false
+ISOTMPMNT_CREATED=false
+SCRATCHDIR_CREATED=false
+WORKDIR_CREATED=false
+SCRATCHISO_CREATED=false
+OEMDRV_DIR_CREATED=false
+OEMDRV_TMP_DIR=""
+
+fail () {
+  echo "$0: $1" >&2
+  exit 1
+}
+
+run_or_fail () {
+  local description=$1
+  shift
+  "$@" || fail "$description"
+}
+
+cleanup_iso_work () {
+  local exit_status=$?
+  trap - EXIT
+
+  if [[ "$ISO_MOUNTED" = "true" ]]; then
+    if umount "$ISOTMPMNT"; then
+      ISO_MOUNTED=false
+    else
+      echo "$0: Cleanup could not unmount $ISOTMPMNT." >&2
+      exit_status=1
+    fi
+  fi
+
+  if [[ "$SCRATCHISO_CREATED" = "true" ]]; then
+    rm -f -- "$SCRATCHDIR/$SCRATCHISONAME" || exit_status=1
+  fi
+  if [[ "$WORKDIR_CREATED" = "true" ]]; then
+    rm -rf -- "$WORKDIR" || exit_status=1
+  fi
+  if [[ "$OEMDRV_DIR_CREATED" = "true" ]]; then
+    rm -f -- "$OEMDRVDIR/$KSCFGDESTFILENAME" || exit_status=1
+    rmdir -- "$OEMDRVDIR" 2>/dev/null || {
+      echo "$0: Cleanup could not remove staging directory $OEMDRVDIR." >&2
+      exit_status=1
+    }
+  fi
+  if [[ -n "$OEMDRV_TMP_DIR" ]]; then
+    rm -rf -- "$OEMDRV_TMP_DIR" || exit_status=1
+  fi
+  if [[ "$ISOTMPMNT_CREATED" = "true" ]]; then
+    rmdir -- "$ISOTMPMNT" 2>/dev/null || exit_status=1
+  fi
+  if [[ "$ISOMNTDIR_CREATED" = "true" ]]; then
+    rmdir -- "$ISOMNTDIR" 2>/dev/null || exit_status=1
+  fi
+  if [[ "$SCRATCHDIR_CREATED" = "true" ]]; then
+    rmdir -- "$SCRATCHDIR" 2>/dev/null || exit_status=1
+  fi
+
+  exit "$exit_status"
+}
+
+trap cleanup_iso_work EXIT
 
 ###################################
 # Credential Generation Variables #
@@ -254,22 +322,46 @@ csv_format_options () {
 if [[ "$CREATEBOOTISO" = "true" || -n "$OEMSRCISO" ]]; then
   # Capture output from blkid and load into variables. ($LABEL needed for mkisofs later.)
   # ISO Volume Name must match or boot will fail
-  eval "$(blkid -o export "$ISOSRCDIR"/"$OEMSRCISO")"
-  OSTYPE=$(echo "$LABEL" | grep -oP '^(.*?)(?=\-)') # Match first text field, "-" as delimiter
-  MAJOROSVERSION=$(echo "$LABEL" | grep -oP '(\d{1,2})' | head -n 1) # Match only first 1 or 2 digits, return only first result
+  iso_metadata=$(blkid -o export "$ISOSRCDIR/$OEMSRCISO") || {
+    echo "$0: Unable to read metadata from $ISOSRCDIR/$OEMSRCISO. Exiting." >&2
+    exit 1
+  }
+  declare -A iso_metadata_fields=()
+  while IFS='=' read -r key value; do
+    case "$key" in
+      DEVNAME|BLOCK_SIZE|UUID|LABEL|TYPE|PTUUID|PTTYPE)
+        iso_metadata_fields["$key"]=$value
+        ;;
+    esac
+  done <<< "$iso_metadata"
+
+  LABEL=${iso_metadata_fields[LABEL]:-}
+  if [[ -z "$LABEL" || "$LABEL" != *-* ]]; then
+    echo "$0: Source ISO label is missing or has an unsupported format. Exiting." >&2
+    exit 1
+  fi
+  OSTYPE=${LABEL%%-*}
+  version_label=${LABEL#*-}
+  if [[ "$version_label" =~ ^[^0-9]*([0-9]+) ]]; then
+    MAJOROSVERSION=${BASH_REMATCH[1]}
+  else
+    echo "$0: Unable to determine OS version from source ISO label '$LABEL'. Exiting." >&2
+    exit 1
+  fi
+
   if [ -n "$OEMSRCISO" ]; then
     echo "$0: Source ISO OS is $OSTYPE $MAJOROSVERSION."
   fi
   if [ "$DEBUG" = "true" ]; then
     echo "$0: ===================================================="
     echo "$0: DEBUG: Values from blkid of $ISOSRCDIR"/"$OEMSRCISO:"
-    echo "$0: DEBUG: DEVNAME=$DEVNAME"
-    echo "$0: DEBUG: BLOCK_SIZE=$BLOCK_SIZE"
-    echo "$0: DEBUG: UUID=$UUID"
+    echo "$0: DEBUG: DEVNAME=${iso_metadata_fields[DEVNAME]:-}"
+    echo "$0: DEBUG: BLOCK_SIZE=${iso_metadata_fields[BLOCK_SIZE]:-}"
+    echo "$0: DEBUG: UUID=${iso_metadata_fields[UUID]:-}"
     echo "$0: DEBUG: LABEL=$LABEL"
-    echo "$0: DEBUG: TYPE=$TYPE"
-    echo "$0: DEBUG: PTUUID=$PTUUID"
-    echo "$0: DEBUG: PTTYPE=$PTTYPE"
+    echo "$0: DEBUG: TYPE=${iso_metadata_fields[TYPE]:-}"
+    echo "$0: DEBUG: PTUUID=${iso_metadata_fields[PTUUID]:-}"
+    echo "$0: DEBUG: PTTYPE=${iso_metadata_fields[PTTYPE]:-}"
     echo "$0: ===================================================="
   fi
 fi
@@ -375,7 +467,7 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   # Check for required root privileges, needed to mount and extract OEM ISO
   if [ "$EUID" -ne 0 ]
     then echo "$0: In order to create the boot ISO, root privileges are required for the \"mount\" command. Please run with sudo or su."
-    exit
+    exit 1
   fi
 fi
 
@@ -416,21 +508,34 @@ if [ "$CREATEBOOTISO" = "true" ]; then
     echo "$0: ISO source file $ISOSRCDIR/$OEMSRCISO not found, please correct. Exiting."
     exit 1
   fi
+  if [[ -e "$WORKDIR" || -L "$WORKDIR" ]]; then
+    fail "Scratch work directory $WORKDIR already exists. Remove or rename it before building."
+  fi
+  if [[ ! -d "$ISOMNTDIR" ]] && [[ ! -h "$ISOMNTDIR" ]]; then
+    mkdir -p "$ISOMNTDIR" || fail "Unable to create ISO mount directory $ISOMNTDIR."
+    ISOMNTDIR_CREATED=true
+  fi
   # Check for temporary ISO mount point, create if needed
   if [[ ! -d "$ISOTMPMNT" ]] && [[ ! -h "$ISOTMPMNT" ]]; then
     echo "$0: ISO temporary mount point $ISOTMPMNT not found. Creating."
-    mkdir -p "$ISOTMPMNT"
-    chmod -R 750 "$ISOTMPMNT"
+    mkdir "$ISOTMPMNT" || fail "Unable to create ISO mount point $ISOTMPMNT."
+    ISOTMPMNT_CREATED=true
+    chmod -R 750 "$ISOTMPMNT" || fail "Unable to set permissions on $ISOTMPMNT."
     echo -e "$0: Setting ownership of $ISOTMPMNT."
-    chown -R "$SUDO_UID":"$SUDO_GID" "$ISOTMPMNT"
+    chown -R "$SUDO_UID":"$SUDO_GID" "$ISOTMPMNT" || fail "Unable to set ownership of $ISOTMPMNT."
   fi
   # Check for scratch space directory, create if needed
   if [[ ! -d "$WORKDIR" ]] && [[ ! -h "$WORKDIR" ]]; then
     echo "$0: Scratch space directory $WORKDIR not found. Creating."
-    mkdir -p "$WORKDIR"
-    chmod -R 750 "$WORKDIR"
+    if [[ ! -d "$SCRATCHDIR" ]] && [[ ! -h "$SCRATCHDIR" ]]; then
+      mkdir -p "$SCRATCHDIR" || fail "Unable to create scratch directory $SCRATCHDIR."
+      SCRATCHDIR_CREATED=true
+    fi
+    mkdir "$WORKDIR" || fail "Unable to create ISO work directory $WORKDIR."
+    WORKDIR_CREATED=true
+    chmod -R 750 "$WORKDIR" || fail "Unable to set permissions on $WORKDIR."
     echo -e "$0: Setting ownership of $WORKDIR."
-    chown -R "$SUDO_UID":"$SUDO_GID" "$WORKDIR"
+    chown -R "$SUDO_UID":"$SUDO_GID" "$WORKDIR" || fail "Unable to set ownership of $WORKDIR."
   fi
 fi 
 
@@ -451,16 +556,23 @@ if [ "$USE_EXISTING_KSCFG" = "false" ]; then
   fi
 fi
 
-# If ISOs are to be created, mkisofs is a dependency
-if [ "$CREATEBOOTISO" = "true" ] || [ "$CREATEOEMDRVISO" = "true" ]; then
+# mkisofs is used for OEMDRV ISOs and boot ISOs before RHEL 10.
+if [ "$CREATEOEMDRVISO" = "true" ] || { [ "$CREATEBOOTISO" = "true" ] && [[ "$MAJOROSVERSION" -lt 10 ]]; }; then
   check_dependency mkisofs
 fi
 
 # If the bootable ISO is to be created, check for required tools
 if [ "$CREATEBOOTISO" = "true" ] ; then
   check_dependency blkid
-  check_dependency isohybrid
   check_dependency implantisomd5
+  if [[ "$MAJOROSVERSION" -ge 10 ]]; then
+    check_dependency xorriso
+    if [[ "$ENABLEFIPS" = "true" || "$KSINBOOTISO" = "true" ]]; then
+      check_dependency mcopy
+    fi
+  else
+    check_dependency isohybrid
+  fi
 fi
 
 # If kickstart validator checks are set, check for required package
@@ -468,9 +580,9 @@ if [ "$KSVALIDATOR_CHECKS" = "true" ] ; then
   check_dependency ksvalidator
 fi
 
-# Create directory for creds if required and does not exist
-if [ "$USE_EXISTING_KSCFG" = "false" ] && { [ "$WRITEPASSWDS" = "true" ] || [ "$WRITESSHKEYS" = "true" ]; }; then
-  mkdir -p "$CREDSDIR"
+# Generated SSH keys are always needed while building the kickstart.
+if [ "$USE_EXISTING_KSCFG" = "false" ]; then
+  mkdir -p "$CREDSDIR" || fail "Unable to create credentials directory $CREDSDIR."
 fi
 
 # Create directory for kickstart file if it does not exist
@@ -548,14 +660,14 @@ fi
 
 if [[ -z "$ssh_pub_key_username_01" ]] ; then
   # Create ssh key pair for user 1 (Ansible Service Account)
-  generate_ssh_keys "$username_01"
+  generate_ssh_keys "$username_01" || fail "Unable to generate SSH keys for $username_01."
   ssh_pub_key_username_01=$(<"$CREDSDIR/${username_01}".id_rsa.pub)
   echo -e "$0: SSH keys for $username_01 created at $(date)"
 fi
 
 if [[ -z "$ssh_pub_key_username_02" ]] ; then
   # Create ssh key pairt for user 2 (Emergency Admin Account)
-  generate_ssh_keys "$username_02"
+  generate_ssh_keys "$username_02" || fail "Unable to generate SSH keys for $username_02."
   ssh_pub_key_username_02=$(<"$CREDSDIR/${username_02}".id_rsa.pub)
   echo -e "$0: SSH keys for $username_02 created at $(date)"
 fi
@@ -913,109 +1025,142 @@ fi
 
 if [ "$CREATEBOOTISO" = "true" ]; then
   # Mount OEM Install Media ISO
-  mount -o ro "$ISOSRCDIR"/"$OEMSRCISO" "$ISOTMPMNT"
+  run_or_fail "Unable to mount source ISO $ISOSRCDIR/$OEMSRCISO." \
+    mount -o ro "$ISOSRCDIR/$OEMSRCISO" "$ISOTMPMNT"
+  ISO_MOUNTED=true
 
   # Extract the ISO image into a working directory
   echo -e "$0: Extracting $OEMSRCISO image into $WORKDIR at $(date)"
-  shopt -s dotglob # Be sure to grab dotfiles also
-  cp -aRf "$ISOTMPMNT"/* "$WORKDIR"
+  run_or_fail "Unable to copy source ISO contents into $WORKDIR." \
+    cp -aRf "$ISOTMPMNT/." "$WORKDIR/"
 
   # Unmount the OEM ISO
-  umount "$ISOTMPMNT"
+  run_or_fail "Unable to unmount source ISO at $ISOTMPMNT." umount "$ISOTMPMNT"
+  ISO_MOUNTED=false
 
-   ## Modify ISO boot menu and options
+  ## Modify ISO boot menu and options
+  grub_cfg_files=()
+  for grub_cfg in "$WORKDIR/EFI/BOOT/grub.cfg" "$WORKDIR/boot/grub2/grub.cfg"; do
+    if [[ -f "$grub_cfg" ]]; then
+      grub_cfg_files+=("$grub_cfg")
+    fi
+  done
+  efi_image_grub_cfg=""
+  if [[ "$MAJOROSVERSION" -ge 10 && ( "$ENABLEFIPS" = "true" || "$KSINBOOTISO" = "true" ) ]]; then
+    if [[ ! -f "$WORKDIR/images/efiboot.img" ]]; then
+      fail "EFI boot image $WORKDIR/images/efiboot.img not found."
+    fi
+    chmod u+w "$WORKDIR/images/efiboot.img" || fail "Unable to make the EFI boot image writable."
+    efi_image_grub_cfg="$WORKDIR/.efi-partition-grub.cfg"
+    mcopy -i "$WORKDIR/images/efiboot.img" ::/EFI/BOOT/grub.cfg "$efi_image_grub_cfg" || fail "Unable to extract GRUB configuration from the EFI boot image."
+    grub_cfg_files+=("$efi_image_grub_cfg")
+  fi
 
   # FIPS mode enabled, insert ks.cfg into boot ISO
   if [ "$ENABLEFIPS" = "true" ] && [ "$KSINBOOTISO" = "true" ]; then
-    # Modify isolinux.cfg for FIPS mode and ks boot
     echo -e "$0: Setting FIPS mode and ks.cfg location in ISO bootloader (FIPS: ON, kickstart in ISO: ON)"
-    sed -i "/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=$KSLOCATION quiet/" "$WORKDIR"/isolinux/isolinux.cfg
-    # Modify grub.cfg for FIPS mode and ks boot
-    sed -i "/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=$KSLOCATION quiet/" "$WORKDIR"/EFI/BOOT/grub.cfg
-    # Modify isolinux.cfg menu title
-    sed -i 's/menu label Install/menu label FIPS mode with kickstart Install/' "$WORKDIR"/isolinux/isolinux.cfg
-    # Modify grub.cfg menu entries
-    sed -i 's/Install/FIPS mode with kickstart Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
-    sed -i 's/Test/FIPS mode with kickstart Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
-    # Copy ks.cfg into working dir
-    cp "$KSFILE" "$WORKDIR"/"$KSCFGDESTFILENAME"
+    if [[ -f "$WORKDIR/isolinux/isolinux.cfg" ]]; then
+      sed -i "/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=$KSLOCATION quiet/" "$WORKDIR"/isolinux/isolinux.cfg || fail "Unable to update isolinux.cfg."
+      sed -i 's/menu label Install/menu label FIPS mode with kickstart Install/' "$WORKDIR"/isolinux/isolinux.cfg || fail "Unable to update isolinux menu label."
+    fi
+    for grub_cfg in "${grub_cfg_files[@]}"; do
+      sed -i "/rescue/!{/fips=1/!s/ quiet/ rd.fips fips=1 quiet/; s/ quiet/ inst.ks=$KSLOCATION quiet/;}" "$grub_cfg" || fail "Unable to update $grub_cfg."
+      sed -i 's/Install/FIPS mode with kickstart Install/' "$grub_cfg" || fail "Unable to update $grub_cfg."
+      sed -i 's/Test/FIPS mode with kickstart Test/' "$grub_cfg" || fail "Unable to update $grub_cfg."
+    done
+    cp "$KSFILE" "$WORKDIR/$KSCFGDESTFILENAME" || fail "Unable to copy kickstart into boot ISO."
   fi
 
   # No FIPS mode, insert ks.cfg into boot ISO
   if [ "$ENABLEFIPS" = "false" ] && [ "$KSINBOOTISO" = "true" ]; then
-      # Modify isolinux.cfg ks boot, no FIPS mode
-      echo -e "$0: Setting ks.cfg location in ISO bootloader (FIPS: OFF, kickstart in ISO: ON)"
-      sed -i "/rescue/!s/ quiet/ inst.ks=$KSLOCATION quiet/" "$WORKDIR"/isolinux/isolinux.cfg
-      # Modify grub.cfg for ks boot, no FIPS mode
-      sed -i "/rescue/!s/ quiet/ inst.ks=$KSLOCATION quiet/" "$WORKDIR"/EFI/BOOT/grub.cfg
-      # Modify isolinux.cfg menu title
-      sed -i 's/menu label Install/menu label kickstart Install/' "$WORKDIR"/isolinux/isolinux.cfg
-      # Modify grub.cfg menu entries to show RandomCreds
-      sed -i 's/Install/kickstart Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
-      sed -i 's/Test/kickstart Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
-      # Copy ks.cfg into working dir
-      cp "$KSFILE" "$WORKDIR"/"$KSCFGDESTFILENAME"
+    echo -e "$0: Setting ks.cfg location in ISO bootloader (FIPS: OFF, kickstart in ISO: ON)"
+    if [[ -f "$WORKDIR/isolinux/isolinux.cfg" ]]; then
+      sed -i "/rescue/!s/ quiet/ inst.ks=$KSLOCATION quiet/" "$WORKDIR"/isolinux/isolinux.cfg || fail "Unable to update isolinux.cfg."
+      sed -i 's/menu label Install/menu label kickstart Install/' "$WORKDIR"/isolinux/isolinux.cfg || fail "Unable to update isolinux menu label."
+    fi
+    for grub_cfg in "${grub_cfg_files[@]}"; do
+      sed -i "/rescue/!s/ quiet/ inst.ks=$KSLOCATION quiet/" "$grub_cfg" || fail "Unable to update $grub_cfg."
+      sed -i 's/Install/kickstart Install/' "$grub_cfg" || fail "Unable to update $grub_cfg."
+      sed -i 's/Test/kickstart Test/' "$grub_cfg" || fail "Unable to update $grub_cfg."
+    done
+    cp "$KSFILE" "$WORKDIR/$KSCFGDESTFILENAME" || fail "Unable to copy kickstart into boot ISO."
   fi
 
   # FIPS mode enabled, do not insert ks.cfg into boot ISO
   if [ "$ENABLEFIPS" = "true" ] && [ "$KSINBOOTISO" = "false" ]; then
-      # Modify isolinux.cfg menu title
-      echo -e "$0: Setting FIPS mode in ISO bootloader (FIPS: ON, kickstart in ISO: OFF)"
-      sed -i 's/menu label Install/menu label FIPS mode Install/' "$WORKDIR"/isolinux/isolinux.cfg
-      # Modify grub.cfg for FIPS mode
-      sed -i '/rescue/!s/ quiet/ rd.fips fips=1 quiet/' "$WORKDIR"/EFI/BOOT/grub.cfg
-      # Modify grub.cfg menu entries to show RandomCreds
-      sed -i 's/Install/FIPS mode Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
-      sed -i 's/Test/FIPS mode Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
+    echo -e "$0: Setting FIPS mode in ISO bootloader (FIPS: ON, kickstart in ISO: OFF)"
+    if [[ -f "$WORKDIR/isolinux/isolinux.cfg" ]]; then
+      sed -i 's/menu label Install/menu label FIPS mode Install/' "$WORKDIR"/isolinux/isolinux.cfg || fail "Unable to update isolinux menu label."
+    fi
+    for grub_cfg in "${grub_cfg_files[@]}"; do
+      sed -i "/rescue/!{/fips=1/!s/ quiet/ rd.fips fips=1 quiet/;}" "$grub_cfg" || fail "Unable to update $grub_cfg."
+      sed -i 's/Install/FIPS mode Install/' "$grub_cfg" || fail "Unable to update $grub_cfg."
+      sed -i 's/Test/FIPS mode Test/' "$grub_cfg" || fail "Unable to update $grub_cfg."
+    done
+  fi
+
+  if [[ -n "$efi_image_grub_cfg" ]]; then
+    mcopy -o -i "$WORKDIR/images/efiboot.img" "$efi_image_grub_cfg" ::/EFI/BOOT/grub.cfg || fail "Unable to update GRUB configuration in the EFI boot image."
+    rm -f -- "$efi_image_grub_cfg" || fail "Unable to remove temporary EFI GRUB configuration."
   fi
 
   # Create new ISO  
   # Note, the relative pathnames in the arguments to mkisofs are required, as per the man page:
   # "The pathname must be relative to the source path..."
   # This is why we do the rather ugly "cd" into the working dir below.
-  cd "$WORKDIR" || { echo "$0: Unable to change directory to $WORKDIR, exiting."; exit 1; }
   echo -e "$0: Building modified ISO image at $(date)."
-  mkisofs -quiet -o ../$SCRATCHISONAME -b isolinux/isolinux.bin -J -R -l -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e images/efiboot.img -no-emul-boot -graft-points -joliet-long -V "$LABEL" .
-  cd "$SRCDIR" || { echo "$0: Unable to change directory to $SRCDIR, exiting."; exit 1; }
+  scratch_iso="$SCRATCHDIR/$SCRATCHISONAME"
+  [[ ! -e "$scratch_iso" ]] || fail "Scratch ISO already exists: $scratch_iso"
+  SCRATCHISO_CREATED=true
+  if [[ "$MAJOROSVERSION" -ge 10 ]]; then
+    xorriso -indev "$ISOSRCDIR/$OEMSRCISO" -outdev "$scratch_iso" \
+      -boot_image any replay -update_r "$WORKDIR" / \
+      -boot_image any efi_boot_part="$WORKDIR/images/efiboot.img" -commit || fail "Unable to build modified hybrid ISO with xorriso."
+  else
+    (
+      cd "$WORKDIR" &&
+        mkisofs -quiet -o "$scratch_iso" -b isolinux/isolinux.bin -J -R -l -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e images/efiboot.img -no-emul-boot -graft-points -joliet-long -V "$LABEL" .
+    ) || fail "Unable to build modified ISO."
+  fi
 
-  # Build UEFI bootable image
-  echo -e "$0: Making $SCRATCHISONAME UEFI bootable at $(date)"
-  isohybrid --uefi "$SCRATCHDIR"/$SCRATCHISONAME 2> /dev/null # Suppress warning about more than 1024 cylinders
+  if [[ "$MAJOROSVERSION" -lt 10 ]]; then
+    echo -e "$0: Making $SCRATCHISONAME UEFI bootable at $(date)"
+    isohybrid --uefi "$scratch_iso" 2> /dev/null || fail "Unable to make the ISO UEFI bootable."
+  fi
 
   # Implant a md5 checksum into the new ISO image
   echo -e "$0: Implanting MD5 checksum into $SCRATCHISONAME at $(date)"
-  implantisomd5 "$SCRATCHDIR"/$SCRATCHISONAME
+  implantisomd5 "$scratch_iso" || fail "Unable to implant ISO checksum."
 
   # Move new iso to ISOs dir
   echo -e "$0: Moving new $SCRATCHISONAME to result directory and renaming to $NEWISONAME at $(date)"
-  mv "$SCRATCHDIR"/$SCRATCHISONAME "$ISORESULTDIR"/"$NEWISONAME"
+  mv "$scratch_iso" "$ISORESULTDIR/$NEWISONAME" || fail "Unable to move ISO into $ISORESULTDIR."
+  SCRATCHISO_CREATED=false
 
-  # Clean up work directory
-  echo -e "$0: Cleaning up temporary files at $(date)"
-  rm -rf "$WORKDIR"
-  rm -rf "$SCRATCHDIR"
-  rm -rf "$ISOMNTDIR"
-
-  # Chown new ISO and other generated files (will be owned by root otherwise)
+  # Chown new iso and other generated files (will be owned by root otherwise)
   echo -e "$0: Setting ownership of $ISORESULTDIR/$NEWISONAME"
-  chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR"/"$NEWISONAME"
+  chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR/$NEWISONAME" || fail "Unable to set ownership of the new ISO."
   if [[ -f "$ISORESULTDIR"/"$OEMDRVISOFILENAME".iso ]]; then
-    chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR"/"$OEMDRVISOFILENAME".iso
+    chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR/$OEMDRVISOFILENAME.iso" || fail "Unable to set ownership of the OEMDRV ISO."
   fi
   ## End Boot ISO Creation Section
 fi
 
 if [ "$CREATEOEMDRVISO" = "true" ]; then
   echo -e "$0: Creating $OEMDRVISOFILENAME.iso at $(date)"
-  # Create OEMDRV scratch dir
-  mkdir -p "$OEMDRVDIR"
-  chown "$SUDO_UID":"$SUDO_GID" "$OEMDRVDIR"
-  rm -f "$OEMDRVDIR"/"$KSCFGDESTFILENAME" # Remove old ks.cfg
-  cp "$KSFILE" "$OEMDRVDIR"/"$KSCFGDESTFILENAME"
-  mkisofs -quiet -V OEMDRV -o "$ISORESULTDIR"/"$OEMDRVISOFILENAME".iso "$OEMDRVDIR"
-  chown "$SUDO_UID":"$SUDO_GID" "$ISORESULTDIR"/"$OEMDRVISOFILENAME".iso
-  rm -f "$OEMDRVDIR"/"$KSCFGDESTFILENAME" # Remove ks.cfg
-  rm -rf "$OEMDRVDIR"
+  if [[ -e "$OEMDRVDIR" || -L "$OEMDRVDIR" ]]; then
+    fail "OEMDRV staging directory $OEMDRVDIR already exists. Remove or rename it before building."
+  fi
+  mkdir -p "$OEMDRVDIR" || fail "Unable to create OEMDRV staging directory $OEMDRVDIR."
+  OEMDRV_DIR_CREATED=true
+  chown "$SUDO_UID":"$SUDO_GID" "$OEMDRVDIR" || fail "Unable to set ownership of $OEMDRVDIR."
+  cp "$KSFILE" "$OEMDRVDIR/$KSCFGDESTFILENAME" || fail "Unable to copy kickstart into OEMDRV staging directory."
+  OEMDRV_TMP_DIR=$(mktemp -d "$ISORESULTDIR/.oemdrv.XXXXXX") || fail "Unable to create temporary OEMDRV output directory."
+  mkisofs -quiet -V OEMDRV -o "$OEMDRV_TMP_DIR/$OEMDRVISOFILENAME.iso" "$OEMDRVDIR" || fail "Unable to create OEMDRV ISO."
+  chown "$SUDO_UID":"$SUDO_GID" "$OEMDRV_TMP_DIR/$OEMDRVISOFILENAME.iso" || fail "Unable to set ownership of the OEMDRV ISO."
+  mv "$OEMDRV_TMP_DIR/$OEMDRVISOFILENAME.iso" "$ISORESULTDIR/$OEMDRVISOFILENAME.iso" || fail "Unable to move OEMDRV ISO into $ISORESULTDIR."
+  rm -rf -- "$OEMDRV_TMP_DIR" || fail "Unable to remove temporary OEMDRV output directory."
+  OEMDRV_TMP_DIR=""
 fi # End CREATEBOOTISO conditional
 
 if [ "$USE_EXISTING_KSCFG" = "false" ]; then
@@ -1056,4 +1201,4 @@ fi
 # Let everyone know we're done here
 echo -n "$0: Total run time: "
 printf '%dd:%dh:%dm:%ds\n' $((SECONDS/86400)) $((SECONDS%86400/3600)) $((SECONDS%3600/60)) \ $((SECONDS%60))
-echo -e "$0: Completed with exit code: $? at $(date)"
+echo "$0: Completed successfully at $(date)"
