@@ -228,6 +228,8 @@ The project began as a way to automate repeat deployments of Linux workstations.
 
 ## Acknowledgments
 
+This project is released under the [MIT License](LICENSE). If you use or adapt it, attribution to Chuck Milam and a link to this repository are appreciated, but not required by the license.
+
 - [How to create a modified Red Hat Enterprise Linux ISO with kickstart file or modified installation media](https://access.redhat.com/solutions/60959)
 - [How to generate a SHA-2 hashed password compatible with `/etc/shadow`](https://access.redhat.com/solutions/221403)
 - [Kickstart commands and options reference](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/performing_an_advanced_rhel_9_installation/kickstart-commands-and-options-reference_installing-rhel-as-an-experienced-user)
