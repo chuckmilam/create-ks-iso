@@ -1,22 +1,39 @@
-name: Shellcheck and Container-Based CI Tests
-on: 
-    push:
-        paths-ignore:
-            - 'README.md'
-jobs:
-    shellcheck:
-      name: Shellcheck
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v3
-        - name: Run ShellCheck
-          uses: ludeeus/action-shellcheck@master
-          with:
-            severity: error
-    test-build-run-create-ks-iso:
-        runs-on: ubuntu-latest
-        steps:
-        - uses: actions/checkout@v3
-        - name: Build and smoke-test the container image
-          run: CONTAINER_ENGINE=docker ./test-container-build.sh
+name: CI
 
+on:
+  push:
+    paths:
+      - '**.sh'
+      - 'CONFIG_FILE'
+      - 'Dockerfile'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - '**.sh'
+      - 'CONFIG_FILE'
+      - 'Dockerfile'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          severity: error
+
+  test-build-run-create-ks-iso:
+    name: Container smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and smoke-test the container image
+        run: CONTAINER_ENGINE=docker ./test-container-build.sh

@@ -1,6 +1,6 @@
 # Create Kickstart and Installation ISOs
 
-[![Container-based CI tests](https://github.com/chuckmilam/create-ks-iso/actions/workflows/create-ks-iso-ci.yml/badge.svg)](https://github.com/chuckmilam/create-ks-iso/actions/workflows/create-ks-iso-ci.yml)
+[![CI](https://github.com/chuckmilam/create-ks-iso/actions/workflows/create-ks-iso-ci.yml/badge.svg)](https://github.com/chuckmilam/create-ks-iso/actions/workflows/create-ks-iso-ci.yml)
 
 `create-ks-iso.sh` generates a RHEL Kickstart configuration and can package it as a separate OEMDRV volume or embed it in a modified, bootable RHEL installation ISO. It is intended for repeatable bootstrap and provisioning workflows, including organizations that need to create their first Linux system from a Windows workstation.
 
